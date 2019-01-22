@@ -83,6 +83,7 @@ export const rowHeight = isMobile ? 64 : 56
 
 const styles = Styles.styleSheetCreate({
   channelname: Styles.platformStyles({
+    // TODO: tweak this so that they take up full space in popup
     common: {
       flexShrink: 0,
       maxWidth: '70%',

@@ -181,6 +181,12 @@ export const makeMoveOrCopy: I.RecordFactory<Types._MoveOrCopy> = I.Record({
   sourceItemPath: Types.stringToPath(''),
 })
 
+export const makeSendAttachmentToChat: I.RecordFactory<Types._SendAttachmentToChat> = I.Record({
+  convID: ChatConstants.noConversationIDKey,
+  filter: '',
+  path: Types.stringToPath('/keybase'),
+})
+
 export const makeSendLinkToChat: I.RecordFactory<Types._SendLinkToChat> = I.Record({
   channels: I.Map(),
   convID: ChatConstants.noConversationIDKey,
@@ -205,6 +211,7 @@ export const makeState: I.RecordFactory<Types._State> = I.Record({
   pathItemActionMenu: makePathItemActionMenu(),
   pathItems: I.Map([[Types.stringToPath('/keybase'), makeFolder()]]),
   pathUserSettings: I.Map([[Types.stringToPath('/keybase'), makePathUserSetting()]]),
+  sendAttachmentToChat: makeSendAttachmentToChat(),
   sendLinkToChat: makeSendLinkToChat(),
   tlfUpdates: I.List(),
   tlfs: makeTlfs(),
