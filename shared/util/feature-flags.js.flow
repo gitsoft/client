@@ -12,6 +12,7 @@ export type FeatureFlags = {|
   newTeamBuildingForChatAllowMakeTeam: boolean,
   outOfDateBanner: boolean,
   plansEnabled: boolean,
+  sendAttachmentToChat: boolean,
   useNewRouter: boolean,
   walletsEnabled: boolean,
 |}

@@ -768,17 +768,13 @@ const closeMoveOrCopy = (state, action) => {
   ]
 }
 
-function* showSendAttachmentToChat(state, action) {
-  const routeChange = Saga.put(
-    action.payload.routePath
-      ? RouteTreeGen.createPutActionIfOnPath({
-          expectedPath: action.payload.routePath,
-          otherAction: RouteTreeGen.createNavigateAppend({path: ['sendAttachmentToChat']}),
-        })
-      : RouteTreeGen.createNavigateAppend({path: ['sendAttachmentToChat']})
-  )
-  yield routeChange
-}
+const showSendAttachmentToChat = (state, action) =>
+  action.payload.routePath
+    ? RouteTreeGen.createPutActionIfOnPath({
+        expectedPath: action.payload.routePath,
+        otherAction: RouteTreeGen.createNavigateAppend({path: ['sendAttachmentToChat']}),
+      })
+    : RouteTreeGen.createNavigateAppend({path: ['sendAttachmentToChat']})
 
 function* showSendLinkToChat(state, action) {
   const elems = Types.getPathElements(state.fs.sendLinkToChat.path)
@@ -915,7 +911,7 @@ function* fsSaga(): Saga.SagaGenerator<any, any> {
   yield* Saga.chainAction<FsGen.ShowMoveOrCopyPayload>(FsGen.showMoveOrCopy, showMoveOrCopy)
   yield* Saga.chainAction<FsGen.CloseMoveOrCopyPayload>(FsGen.closeMoveOrCopy, closeMoveOrCopy)
   yield* Saga.chainGenerator<FsGen.ShowSendLinkToChatPayload>(FsGen.showSendLinkToChat, showSendLinkToChat)
-  yield* Saga.chainGenerator<FsGen.ShowSendLinkToChatPayload>(
+  yield* Saga.chainAction<FsGen.ShowSendLinkToChatPayload>(
     FsGen.showSendAttachmentToChat,
     showSendAttachmentToChat
   )
