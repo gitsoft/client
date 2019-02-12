@@ -143,7 +143,7 @@ func testRevokePaperDevice(t *testing.T, upgradePerUserKey bool) {
 
 	assertNumDevicesAndKeys(tc, u, 2, 4)
 
-	revokeAnyPaperKey(tc, u)
+	RevokeAnyPaperKey(tc, u)
 
 	assertNumDevicesAndKeys(tc, u, 1, 2)
 
@@ -207,10 +207,10 @@ func testRevokerPaperDeviceTwice(t *testing.T, upgradePerUserKey bool) {
 	assertNumDevicesAndKeys(tc, u, 3, 6)
 
 	t.Logf("revoke paper key 1")
-	revokeAnyPaperKey(tc, u)
+	RevokeAnyPaperKey(tc, u)
 
 	t.Logf("revoke paper key 2")
-	revokeAnyPaperKey(tc, u)
+	RevokeAnyPaperKey(tc, u)
 
 	t.Logf("check")
 	assertNumDevicesAndKeys(tc, u, 1, 2)
@@ -448,7 +448,7 @@ func TestLogoutAndDeprovisionIfRevokedNoop(t *testing.T) {
 	}
 }
 
-func revokeAnyPaperKey(tc libkb.TestContext, fu *FakeUser) *libkb.Device {
+func RevokeAnyPaperKey(tc libkb.TestContext, fu *FakeUser) *libkb.Device {
 	t := tc.T
 	t.Logf("revoke a paper key")
 	devices, _ := getActiveDevicesAndKeys(tc, fu)

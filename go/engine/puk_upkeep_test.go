@@ -26,7 +26,7 @@ func TestPerUserKeyUpkeep(t *testing.T) {
 	require.False(t, upkeep().DidRollKey, "don't roll")
 
 	t.Logf("revoke paper key")
-	revokeAnyPaperKey(tc, fu)
+	RevokeAnyPaperKey(tc, fu)
 
 	require.False(t, upkeep().DidRollKey, "don't roll after revoke-other")
 

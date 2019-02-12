@@ -112,3 +112,32 @@ type TeamAuditParams struct {
 	Parallelism           int
 	LRUSize               int
 }
+
+type nullTeamBoxAuditor struct{}
+
+var nullBoxAuditorError = fmt.Errorf("No team box auditor found. Are you running in standalone mode?")
+
+var _ TeamBoxAuditor = nullTeamBoxAuditor{}
+
+func (n nullTeamBoxAuditor) AssertUnjailedOrReaudit(m MetaContext, id keybase1.TeamID) error {
+	return nullBoxAuditorError
+}
+
+func (n nullTeamBoxAuditor) IsInJail(m MetaContext, id keybase1.TeamID) (bool, error) {
+	return false, nullBoxAuditorError
+}
+func (n nullTeamBoxAuditor) RetryNextBoxAudit(m MetaContext) (err error) {
+	return nullBoxAuditorError
+}
+func (n nullTeamBoxAuditor) BoxAuditRandomTeam(m MetaContext) (err error) {
+	return nullBoxAuditorError
+}
+func (n nullTeamBoxAuditor) BoxAuditTeam(m MetaContext, id keybase1.TeamID) (err error) {
+	return nullBoxAuditorError
+}
+func (n nullTeamBoxAuditor) Attempt(m MetaContext, id keybase1.TeamID, rotateBeforeAudit bool) keybase1.BoxAuditAttempt {
+	msg := nullBoxAuditorError.Error()
+	return keybase1.BoxAuditAttempt{Error: &msg}
+}
+func (n nullTeamBoxAuditor) OnLogout(m MetaContext) {}
+func newNullTeamBoxAuditor() nullTeamBoxAuditor     { return nullTeamBoxAuditor{} }

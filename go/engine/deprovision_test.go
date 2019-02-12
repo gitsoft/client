@@ -128,12 +128,12 @@ func assertDeprovisionWithSetup(tc libkb.TestContext, targ assertDeprovisionWith
 		require.NoError(t, err)
 		require.NotEqual(t, 0, len(eng.Passphrase()), "empty passphrase")
 
-		revokeAnyPaperKey(tc, fu)
+		RevokeAnyPaperKey(tc, fu)
 	}
 
 	if targ.revokePaperKey {
 		tc.T.Logf("revoking paper key (targ)")
-		revokeAnyPaperKey(tc, fu)
+		RevokeAnyPaperKey(tc, fu)
 		expectedNumKeys -= 2
 	}
 

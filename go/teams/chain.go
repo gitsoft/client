@@ -567,6 +567,10 @@ func (t *TeamSigChainState) FindActiveKeybaseInvite(uid keybase1.UID) (keybase1.
 	return keybase1.TeamInvite{}, keybase1.UserVersion{}, false
 }
 
+func (t *TeamSigChainState) GetBoxSummaryHashes() map[keybase1.PerTeamKeyGeneration][]keybase1.BoxSummaryHash {
+	return t.inner.BoxSummaryHashes
+}
+
 // --------------------------------------------------
 
 // AppendChainLink process a chain link.
@@ -848,6 +852,8 @@ func (t *teamSigchainPlayer) addInnerLink(
 			enforceGeneric("completed-invites", rules.CompletedInvites, team.CompletedInvites != nil),
 			enforceGeneric("settings", rules.Settings, team.Settings != nil),
 			enforceGeneric("kbfs", rules.KBFS, team.KBFS != nil),
+			enforceGeneric("box-summary-hash", rules.BoxSummaryHash, team.BoxSummaryHash != nil),
+			// TODO add here
 			allowInImplicitTeam(rules.AllowInImplicitTeam),
 			allowInflate(rules.AllowInflate),
 			enforceFirstInChain(rules.FirstInChain),
@@ -892,6 +898,7 @@ func (t *teamSigchainPlayer) addInnerLink(
 			Name:                TristateRequire,
 			Members:             TristateRequire,
 			PerTeamKey:          TristateRequire,
+			BoxSummaryHash:      TristateOptional,
 			Invites:             TristateOptional,
 			Settings:            TristateOptional,
 			AllowInImplicitTeam: true,
@@ -968,6 +975,7 @@ func (t *teamSigchainPlayer) addInnerLink(
 				ActiveInvites:    make(map[keybase1.TeamInviteID]keybase1.TeamInvite),
 				ObsoleteInvites:  make(map[keybase1.TeamInviteID]keybase1.TeamInvite),
 				TlfLegacyUpgrade: make(map[keybase1.TeamApplication]keybase1.TeamLegacyTLFUpgradeChainInfo),
+				BoxSummaryHashes: make(map[keybase1.PerTeamKeyGeneration][]keybase1.BoxSummaryHash),
 			}}
 
 		t.updateMembership(&res.newState, roleUpdates, payload.SignatureMetadata())
@@ -1001,13 +1009,15 @@ func (t *teamSigchainPlayer) addInnerLink(
 			}
 		}
 	case libkb.LinkTypeChangeMembership:
-		err = enforce(LinkRules{
+		changeMembershipRules := LinkRules{
 			Members:             TristateRequire,
 			PerTeamKey:          TristateOptional,
 			Admin:               TristateOptional,
 			CompletedInvites:    TristateOptional,
+			BoxSummaryHash:      TristateOptional, //always optional
 			AllowInImplicitTeam: true,
-		})
+		}
+		err = enforce(changeMembershipRules)
 		if err != nil {
 			return res, err
 		}
@@ -1140,6 +1150,15 @@ func (t *teamSigchainPlayer) addInnerLink(
 			return res, fmt.Errorf("could not determine if high user set changed")
 		}
 
+		if team.PerTeamKey != nil {
+			// TODO won't be true until after a certain date...
+			changeMembershipRules.BoxSummaryHash = TristateOptional
+			err = enforce(changeMembershipRules)
+			if err != nil {
+				return res, err
+			}
+		}
+
 		moveState()
 		t.updateMembership(&res.newState, roleUpdates, payload.SignatureMetadata())
 		t.completeInvites(&res.newState, team.CompletedInvites)
@@ -1163,6 +1182,7 @@ func (t *teamSigchainPlayer) addInnerLink(
 		err = enforce(LinkRules{
 			PerTeamKey:          TristateRequire,
 			Admin:               TristateOptional,
+			BoxSummaryHash:      TristateOptional,
 			AllowInImplicitTeam: true,
 		})
 		if err != nil {
@@ -1259,13 +1279,14 @@ func (t *teamSigchainPlayer) addInnerLink(
 		isHighLink = true
 
 		err = enforce(LinkRules{
-			Name:         TristateRequire,
-			Members:      TristateRequire,
-			Parent:       TristateRequire,
-			PerTeamKey:   TristateRequire,
-			Admin:        TristateOptional,
-			Settings:     TristateOptional,
-			FirstInChain: true,
+			Name:           TristateRequire,
+			Members:        TristateRequire,
+			Parent:         TristateRequire,
+			PerTeamKey:     TristateRequire,
+			Admin:          TristateOptional,
+			Settings:       TristateOptional,
+			BoxSummaryHash: TristateOptional,
+			FirstInChain:   true,
 		})
 		if err != nil {
 			return res, err
@@ -1326,17 +1347,18 @@ func (t *teamSigchainPlayer) addInnerLink(
 					LastPart: teamName.LastPart(),
 					Seqno:    1,
 				}},
-				LastSeqno:       1,
-				LastLinkID:      link.LinkID().Export(),
-				ParentID:        &parentID,
-				UserLog:         make(map[keybase1.UserVersion][]keybase1.UserLogPoint),
-				SubteamLog:      make(map[keybase1.TeamID][]keybase1.SubteamLogPoint),
-				PerTeamKeys:     perTeamKeys,
-				PerTeamKeyCTime: keybase1.UnixTime(payload.Ctime),
-				LinkIDs:         make(map[keybase1.Seqno]keybase1.LinkID),
-				StubbedLinks:    make(map[keybase1.Seqno]bool),
-				ActiveInvites:   make(map[keybase1.TeamInviteID]keybase1.TeamInvite),
-				ObsoleteInvites: make(map[keybase1.TeamInviteID]keybase1.TeamInvite),
+				LastSeqno:        1,
+				LastLinkID:       link.LinkID().Export(),
+				ParentID:         &parentID,
+				UserLog:          make(map[keybase1.UserVersion][]keybase1.UserLogPoint),
+				SubteamLog:       make(map[keybase1.TeamID][]keybase1.SubteamLogPoint),
+				PerTeamKeys:      perTeamKeys,
+				PerTeamKeyCTime:  keybase1.UnixTime(payload.Ctime),
+				LinkIDs:          make(map[keybase1.Seqno]keybase1.LinkID),
+				StubbedLinks:     make(map[keybase1.Seqno]bool),
+				ActiveInvites:    make(map[keybase1.TeamInviteID]keybase1.TeamInvite),
+				ObsoleteInvites:  make(map[keybase1.TeamInviteID]keybase1.TeamInvite),
+				BoxSummaryHashes: make(map[keybase1.PerTeamKeyGeneration][]keybase1.BoxSummaryHash),
 			}}
 
 		t.updateMembership(&res.newState, roleUpdates, payload.SignatureMetadata())
@@ -1625,6 +1647,15 @@ func (t *teamSigchainPlayer) addInnerLink(
 			return res, fmt.Errorf("unsupported link type: %s", payload.Body.Type)
 		}
 	}
+
+	g := res.newState.GetLatestGeneration()
+	batch := res.newState.inner.BoxSummaryHashes[g]
+	// TODO may not exist etc
+	// TODO remove != nil check, do rollout handling
+	if team.BoxSummaryHash != nil && res.newState.inner.BoxSummaryHashes != nil {
+		res.newState.inner.BoxSummaryHashes[g] = append(batch, team.BoxSummaryHash.BoxSummaryHash())
+	}
+
 	if isHighLink {
 		res.newState.inner.LastHighLinkID = link.LinkID().Export()
 		res.newState.inner.LastHighSeqno = link.Seqno()
@@ -2175,6 +2206,7 @@ type LinkRules struct {
 	CompletedInvites Tristate
 	Settings         Tristate
 	KBFS             Tristate
+	BoxSummaryHash   Tristate
 
 	AllowInImplicitTeam bool // whether this link is allowed in implicit team chains
 	AllowInflate        bool // whether this link is allowed to be filled later

@@ -566,3 +566,7 @@ func ModifyFeatureForTest(m MetaContext, feature Feature, on bool, cacheSec int)
 func AddEnvironmentFeatureForTest(tc TestContext, feature Feature) {
 	tc.Tp.EnvironmentFeatureFlags = append(tc.Tp.EnvironmentFeatureFlags, feature)
 }
+
+// func ShouldRetry(tc TestContext, feature Feature) {
+// 	tc.Tp.EnvironmentFeatureFlags = append(tc.Tp.EnvironmentFeatureFlags, feature)
+// }
