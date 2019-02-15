@@ -558,7 +558,8 @@ func (md *RootMetadataV3) CheckValidSuccessor(
 	}
 
 	// (2) Check TLF ID.
-	if nextMd.TlfID() != md.TlfID() {
+	a := nextMd.TlfID()
+	if a != md.TlfID() {
 		return MDTlfIDMismatch{
 			CurrID: md.TlfID(),
 			NextID: nextMd.TlfID(),

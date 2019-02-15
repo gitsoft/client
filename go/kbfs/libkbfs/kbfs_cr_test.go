@@ -5,7 +5,7 @@
 package libkbfs
 
 import (
-	"errors"
+	"fmt"
 	"os"
 	"sync"
 	"testing"
@@ -783,6 +783,22 @@ func TestBasicCRFailureAndFixing(t *testing.T) {
 	config2 := ConfigAsUser(config1, userName2)
 	defer CheckConfigAndShutdown(ctx, t, config2)
 
+	// Enable journaling on user 2
+	tempdir, err := ioutil.TempDir(os.TempDir(), "journal_for_fail_fix")
+	defer os.RemoveAll(tempdir)
+	require.NoError(t, err)
+	err = config2.EnableDiskLimiter(tempdir)
+	require.NoError(t, err)
+	err = config2.EnableJournaling(ctx, tempdir,
+		TLFJournalBackgroundWorkEnabled)
+	require.NoError(t, err)
+	jManager, err := GetJournalManager(config2)
+	require.NoError(t, err)
+	jManager.onBranchChange = nil
+	jManager.onMDFlush = nil
+	err = jManager.EnableAuto(ctx)
+	require.NoError(t, err)
+
 	clock, _ := newTestClockAndTimeNow()
 	config2.SetClock(clock)
 
@@ -808,17 +824,12 @@ func TestBasicCRFailureAndFixing(t *testing.T) {
 	fileB2, _, err := kbfsOps2.Lookup(ctx, dirA2, "b")
 	require.NoError(t, err)
 
-	// TODO: enable journaling for user 2
-
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mdOps := NewMockMDOps(ctrl)
-	mdOps.EXPECT().ResolveBranch(gomock.Any(), gomock.Any(), gomock.Any(),
-		gomock.Any(), gomock.Any(), gomock.Any()).Return(ImmutableRootMetadata{},
-		errors.New("fake error")).AnyTimes()
-	// TODO: expect Put call?
-	config2.SetMDOps(mdOps)
+	err = SetCRFailureForTesting(ctx, config2, rootNode2.GetFolderBranch(),
+		alwaysFailCR)
+	require.NoError(t, err)
 
 	// disable updates on user 2
 	c, err := DisableUpdatesForTesting(config2, rootNode2.GetFolderBranch())
@@ -848,15 +859,54 @@ func TestBasicCRFailureAndFixing(t *testing.T) {
 	require.NoError(t, err)
 	err = kbfsOps2.SyncFromServer(ctx,
 		rootNode2.GetFolderBranch(), nil)
+	require.Error(t, err)
+
+	ops, ok := config2.KBFSOps().(*KBFSOpsStandard)
+	require.True(t, ok)
+	fbo := ops.getOpsNoAdd(ctx, rootNode2.GetFolderBranch())
+
+	for i := 0; i < 10; i++ {
+		fileName := fmt.Sprintf("file%d", i)
+		newFile, _, err := kbfsOps2.CreateFile(ctx, dirA2, fileName, false,
+			NoExcl)
+		require.NoError(t, err, "Loop %d", i)
+		err = kbfsOps2.SyncAll(ctx, newFile.GetFolderBranch())
+		require.NoError(t, err, "Loop %d", i)
+		err = fbo.cr.Wait(ctx)
+		require.NoError(t, err, "Loop %d", i)
+	}
+
+	// Check that there is conflict state in the CR DB.
+	crdb := config2.GetConflictResolutionDB()
+	data, err := crdb.Get(fbo.id().Bytes(), nil)
+	require.NoError(t, err)
+	require.NotZero(t, len(data))
+
+	// Clear the conflict state
+	err = fbo.clearConflictView(context.Background())
 	require.NoError(t, err)
 
-	// TODO: try CR 10 more times. On the 10th time it should ignore instead of
-	//  failing
+	// Trigger CR and wait for it to resolve.
+	_, _, err = kbfsOps2.CreateFile(ctx, dirA2, "newFile", false, NoExcl)
+	require.NoError(t, err)
+	err = fbo.cr.Wait(ctx)
+	require.NoError(t, err)
 
-	// TODO: check .kbfs_status and verify that the conflict state is there
-	// TODO: check the file itself and make sure it is different on both places
-	// TODO: call clear conflicts
-	// TODO: check the conflict is gone.
+	// Verify that the conflict is resolved.
+	children1, err := kbfsOps1.GetDirChildren(ctx, dirA1)
+	require.NoError(t, err)
+
+	children2, err := kbfsOps2.GetDirChildren(ctx, dirA2)
+	require.NoError(t, err)
+
+	assert.Equal(t, len(children2), len(children1))
+
+	for child := range children2 {
+		_, ok := children1[child]
+		assert.True(t, ok)
+	}
+
+	require.Equal(t, children1, children2)
 }
 
 // Tests that two users can create the same file simultaneously, and
