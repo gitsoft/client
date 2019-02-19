@@ -3425,6 +3425,12 @@ func (cr *ConflictResolver) doResolve(ctx context.Context, ci conflictInput) {
 			"Could not record conflict resolution attempt: %+v", err)
 	}
 
+	_, err = os.Stat("/tmp/no_cr")
+	if err == nil {
+		err = errors.New("CR disabled")
+		return
+	}
+
 	cr.log.CDebugf(ctx, "Starting conflict resolution with input %+v", ci)
 	lState := makeFBOLockState()
 	defer func() {

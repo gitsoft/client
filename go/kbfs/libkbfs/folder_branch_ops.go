@@ -713,28 +713,12 @@ func (fbo *folderBranchOps) clearConflictView(ctx context.Context) error {
 
 	journalEnabled := TLFJournalEnabled(fbo.config, fbo.id())
 	if journalEnabled {
-		err := fbo.unstageLocked(ctx, lState, moveJournalsAway)
-		if err != nil {
-			return err
-		}
-		journalManager, err := GetJournalManager(fbo.config)
-		if err != nil {
-			return err
-		}
-		journal, ok := journalManager.getTLFJournal(fbo.folderBranch.Tlf,
-			fbo.head.GetTlfHandle())
-		if !ok {
-			return errJournalNotAvailable
-		}
-		err = journal.moveAway(ctx)
-		if err != nil {
-			return err
-		}
+		err = fbo.unstageLocked(ctx, lState, moveJournalsAway)
 	} else {
-		err := fbo.unstageLocked(ctx, lState, doPruneBranches)
-		if err != nil {
-			return err
-		}
+		err = fbo.unstageLocked(ctx, lState, doPruneBranches)
+	}
+	if err != nil {
+		return err
 	}
 	return fbo.cr.clearConflictRecords()
 }

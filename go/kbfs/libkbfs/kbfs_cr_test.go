@@ -857,9 +857,12 @@ func TestBasicCRFailureAndFixing(t *testing.T) {
 		BackgroundContextWithCancellationDelayer(), config2,
 		rootNode2.GetFolderBranch())
 	require.NoError(t, err)
-	err = kbfsOps2.SyncFromServer(ctx,
+
+	// Because CR is disabled for this TLF, SyncFromServer will hang.
+	ctxWithSoonCancel, _ := context.WithTimeout(ctx, time.Second)
+	err = kbfsOps2.SyncFromServer(ctxWithSoonCancel,
 		rootNode2.GetFolderBranch(), nil)
-	require.Error(t, err)
+	require.EqualError(t, err, "context deadline exceeded")
 
 	ops, ok := config2.KBFSOps().(*KBFSOpsStandard)
 	require.True(t, ok)
@@ -886,25 +889,38 @@ func TestBasicCRFailureAndFixing(t *testing.T) {
 	err = fbo.clearConflictView(context.Background())
 	require.NoError(t, err)
 
+	err = kbfsOps2.SyncFromServer(ctx,
+		rootNode2.GetFolderBranch(), nil)
+	require.NoError(t, err)
+
 	// Trigger CR and wait for it to resolve.
+	dirA2, _, err = kbfsOps2.Lookup(ctx, rootNode2, "a")
+	require.NoError(t, err)
 	_, _, err = kbfsOps2.CreateFile(ctx, dirA2, "newFile", false, NoExcl)
 	require.NoError(t, err)
 	err = fbo.cr.Wait(ctx)
 	require.NoError(t, err)
+	err = kbfsOps2.SyncAll(ctx, dirA2.GetFolderBranch())
+	require.NoError(t, err)
 
 	// Verify that the conflict is resolved.
+	err = kbfsOps1.SyncFromServer(ctx,
+		rootNode1.GetFolderBranch(), nil)
+	require.NoError(t, err)
+
+	status1, _, err := kbfsOps1.FolderStatus(ctx,
+		rootNode1.GetFolderBranch())
+
+	status2, _, err := kbfsOps2.FolderStatus(ctx,
+		rootNode2.GetFolderBranch())
+
+	fmt.Printf("%s\n\n%s\n\n", status1, status2)
+
 	children1, err := kbfsOps1.GetDirChildren(ctx, dirA1)
 	require.NoError(t, err)
 
 	children2, err := kbfsOps2.GetDirChildren(ctx, dirA2)
 	require.NoError(t, err)
-
-	assert.Equal(t, len(children2), len(children1))
-
-	for child := range children2 {
-		_, ok := children1[child]
-		assert.True(t, ok)
-	}
 
 	require.Equal(t, children1, children2)
 }
