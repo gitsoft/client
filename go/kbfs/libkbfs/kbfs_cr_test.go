@@ -898,11 +898,13 @@ func TestBasicCRFailureAndFixing(t *testing.T) {
 	require.NoError(t, err)
 	_, _, err = kbfsOps2.CreateFile(ctx, dirA2, "newFile", false, NoExcl)
 	require.NoError(t, err)
-	err = fbo.cr.Wait(ctx)
-	require.NoError(t, err)
+
 	err = kbfsOps2.SyncAll(ctx, dirA2.GetFolderBranch())
 	require.NoError(t, err)
+	err = fbo.cr.Wait(ctx)
+	require.NoError(t, err)
 
+	fbo.log.CWarningf(ctx, "---ZZZ--")
 	// Verify that the conflict is resolved.
 	err = kbfsOps2.SyncFromServer(ctx,
 		rootNode2.GetFolderBranch(), nil)
@@ -918,7 +920,7 @@ func TestBasicCRFailureAndFixing(t *testing.T) {
 	status2, _, err := kbfsOps2.FolderStatus(ctx,
 		rootNode2.GetFolderBranch())
 
-	fmt.Printf("%s\n\n%s\n\n", status1, status2)
+	fbo.log.CWarningf(ctx, "%s\n\n%s\n\n", status1, status2)
 
 	children1, err := kbfsOps1.GetDirChildren(ctx, dirA1)
 	require.NoError(t, err)
