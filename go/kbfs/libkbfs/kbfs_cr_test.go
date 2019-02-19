@@ -885,12 +885,12 @@ func TestBasicCRFailureAndFixing(t *testing.T) {
 	require.NoError(t, err)
 	require.NotZero(t, len(data))
 
-	// Clear the conflict state
+	// Clear the conflict state and re-enable CR
 	err = fbo.clearConflictView(context.Background())
 	require.NoError(t, err)
 
-	err = kbfsOps2.SyncFromServer(ctx,
-		rootNode2.GetFolderBranch(), nil)
+	err = SetCRFailureForTesting(ctx, config2, rootNode2.GetFolderBranch(),
+		doNotAlwaysFailCR)
 	require.NoError(t, err)
 
 	// Trigger CR and wait for it to resolve.
@@ -904,6 +904,10 @@ func TestBasicCRFailureAndFixing(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify that the conflict is resolved.
+	err = kbfsOps2.SyncFromServer(ctx,
+		rootNode2.GetFolderBranch(), nil)
+	require.NoError(t, err)
+
 	err = kbfsOps1.SyncFromServer(ctx,
 		rootNode1.GetFolderBranch(), nil)
 	require.NoError(t, err)
@@ -922,7 +926,7 @@ func TestBasicCRFailureAndFixing(t *testing.T) {
 	children2, err := kbfsOps2.GetDirChildren(ctx, dirA2)
 	require.NoError(t, err)
 
-	require.Equal(t, children1, children2)
+	require.Equal(t, children2, children1)
 }
 
 // Tests that two users can create the same file simultaneously, and

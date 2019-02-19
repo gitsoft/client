@@ -696,17 +696,24 @@ var errJournalNotAvailable = errors.New("could not get journal for TLF")
 
 // clearConflictView tells the journal to move any pending writes elsewhere,
 // resets the CR counter, and resets the FBO to have a synced view of the TLF.
-func (fbo *folderBranchOps) clearConflictView(ctx context.Context) error {
+func (fbo *folderBranchOps) clearConflictView(baseCtx context.Context) (
+	err error) {
 	// TODO later: show the cleared conflict view under a special path,
 	//  so users can copy any unmerged files manually back into
 	//  their synced view before nuking it.
+
+	fbo.log.CDebugf(baseCtx, "Clearing conflict view")
+	defer func() {
+		fbo.log.CDebugf(baseCtx, "Done with clearConflictView: %+v", err)
+	}()
 
 	lState := makeFBOLockState()
 	fbo.mdWriterLock.Lock(lState)
 	defer fbo.mdWriterLock.Unlock(lState)
 
-	ctx = fbo.ctxWithFBOID(ctx)
-	ctx, err := NewContextWithCancellationDelayer(ctx)
+	var ctx context.Context
+	ctx = fbo.ctxWithFBOID(baseCtx)
+	ctx, err = NewContextWithCancellationDelayer(ctx)
 	if err != nil {
 		return err
 	}
