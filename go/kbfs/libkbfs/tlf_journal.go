@@ -2521,6 +2521,8 @@ func (j *tlfJournal) moveAway(ctx context.Context) error {
 	j.blockJournal = blockJournal
 	j.mdJournal = mdJournal
 
+	j.resume(journalPauseConflict)
+	j.signalWork()
 	return nil
 }
 

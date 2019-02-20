@@ -6456,12 +6456,26 @@ func (fbo *folderBranchOps) undoUnmergedMDUpdatesLocked(
 		for _, op := range rmd.data.Changes.Ops {
 			for _, ptr := range op.Refs() {
 				if ptr != zeroPtr {
-					unmergedPtrs = append(unmergedPtrs, ptr)
+					unflushed, err := fbo.config.BlockServer().IsUnflushed(
+						ctx, rmd.tlfHandle.tlfID, ptr.ID)
+					if err != nil {
+						return nil, err
+					}
+					if !unflushed {
+						unmergedPtrs = append(unmergedPtrs, ptr)
+					}
 				}
 			}
 			for _, update := range op.allUpdates() {
 				if update.Ref != zeroPtr {
-					unmergedPtrs = append(unmergedPtrs, update.Ref)
+					unflushed, err := fbo.config.BlockServer().IsUnflushed(
+						ctx, rmd.tlfHandle.tlfID, update.Ref.ID)
+					if err != nil {
+						return nil, err
+					}
+					if !unflushed {
+						unmergedPtrs = append(unmergedPtrs, update.Ref)
+					}
 				}
 			}
 		}

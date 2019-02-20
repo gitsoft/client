@@ -862,7 +862,7 @@ func TestBasicCRFailureAndFixing(t *testing.T) {
 	ctxWithSoonCancel, _ := context.WithTimeout(ctx, time.Second)
 	err = kbfsOps2.SyncFromServer(ctxWithSoonCancel,
 		rootNode2.GetFolderBranch(), nil)
-	require.EqualError(t, err, "context deadline exceeded")
+	require.Error(t, err, "context deadline exceeded")
 
 	ops, ok := config2.KBFSOps().(*KBFSOpsStandard)
 	require.True(t, ok)
@@ -920,7 +920,7 @@ func TestBasicCRFailureAndFixing(t *testing.T) {
 	status2, _, err := kbfsOps2.FolderStatus(ctx,
 		rootNode2.GetFolderBranch())
 
-	fbo.log.CWarningf(ctx, "%s\n\n%s\n\n", status1, status2)
+	fbo.log.CWarningf(ctx, "%v\n\n%v\n\n", status1, status2)
 
 	children1, err := kbfsOps1.GetDirChildren(ctx, dirA1)
 	require.NoError(t, err)
