@@ -13,10 +13,11 @@ type locksRepo struct {
 }
 
 var initLocksOnce sync.Once
-var locks = &locksRepo{}
+var locks *locksRepo
 
-func (l *locksRepo) initOnce(g *globals.Context) {
+func initLocksRepoOnce(g *globals.Context) {
 	initLocksOnce.Do(func() {
-		l.StorageLockTab = utils.NewConversationLockTab(g)
+		locks = &locksRepo{}
+		locks.StorageLockTab = utils.NewConversationLockTab(g)
 	})
 }
