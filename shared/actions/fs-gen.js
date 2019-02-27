@@ -12,7 +12,7 @@ export const resetStore = 'common:resetStore' // not a part of fs but is handled
 export const typePrefix = 'fs:'
 export const cancelDownload = 'fs:cancelDownload'
 export const clearRefreshTag = 'fs:clearRefreshTag'
-export const closeMoveOrCopy = 'fs:closeMoveOrCopy'
+export const closeDestinationPicker = 'fs:closeDestinationPicker'
 export const commitEdit = 'fs:commitEdit'
 export const copy = 'fs:copy'
 export const deleteFile = 'fs:deleteFile'
@@ -35,6 +35,7 @@ export const folderListLoaded = 'fs:folderListLoaded'
 export const fsError = 'fs:fsError'
 export const fuseStatus = 'fs:fuseStatus'
 export const fuseStatusResult = 'fs:fuseStatusResult'
+export const incomingShareOpen = 'fs:incomingShareOpen'
 export const installFuse = 'fs:installFuse'
 export const installFuseResult = 'fs:installFuseResult'
 export const installKBFS = 'fs:installKBFS'
@@ -86,7 +87,7 @@ export const userFileEditsLoaded = 'fs:userFileEditsLoaded'
 // Payload Types
 type _CancelDownloadPayload = $ReadOnly<{|key: string|}>
 type _ClearRefreshTagPayload = $ReadOnly<{|refreshTag: Types.RefreshTag|}>
-type _CloseMoveOrCopyPayload = void
+type _CloseDestinationPickerPayload = void
 type _CommitEditPayload = $ReadOnly<{|editID: Types.EditID|}>
 type _CopyPayload = $ReadOnly<{|destinationParentPath: Types.Path|}>
 type _DeleteFilePayload = $ReadOnly<{|path: Types.Path|}>
@@ -109,6 +110,7 @@ type _FolderListLoadedPayload = $ReadOnly<{|path: Types.Path, pathItems: I.Map<T
 type _FsErrorPayload = $ReadOnly<{|error: Types.FsError|}>
 type _FuseStatusPayload = void
 type _FuseStatusResultPayload = $ReadOnly<{|prevStatus: ?RPCTypes.FuseStatus, status: RPCTypes.FuseStatus|}>
+type _IncomingShareOpenPayload = $ReadOnly<{|routePath: I.List<string>, path: Types.Path, currentIndex: number|}>
 type _InstallFusePayload = void
 type _InstallFuseResultPayload = $ReadOnly<{|kextPermissionError: boolean|}>
 type _InstallKBFSPayload = void
@@ -160,7 +162,7 @@ type _UserFileEditsLoadedPayload = $ReadOnly<{|tlfUpdates: Types.UserTlfUpdates|
 // Action Creators
 export const createCancelDownload = (payload: _CancelDownloadPayload) => ({payload, type: cancelDownload})
 export const createClearRefreshTag = (payload: _ClearRefreshTagPayload) => ({payload, type: clearRefreshTag})
-export const createCloseMoveOrCopy = (payload: _CloseMoveOrCopyPayload) => ({payload, type: closeMoveOrCopy})
+export const createCloseDestinationPicker = (payload: _CloseDestinationPickerPayload) => ({payload, type: closeDestinationPicker})
 export const createCommitEdit = (payload: _CommitEditPayload) => ({payload, type: commitEdit})
 export const createCopy = (payload: _CopyPayload) => ({payload, type: copy})
 export const createDeleteFile = (payload: _DeleteFilePayload) => ({payload, type: deleteFile})
@@ -183,6 +185,7 @@ export const createFolderListLoaded = (payload: _FolderListLoadedPayload) => ({p
 export const createFsError = (payload: _FsErrorPayload) => ({payload, type: fsError})
 export const createFuseStatus = (payload: _FuseStatusPayload) => ({payload, type: fuseStatus})
 export const createFuseStatusResult = (payload: _FuseStatusResultPayload) => ({payload, type: fuseStatusResult})
+export const createIncomingShareOpen = (payload: _IncomingShareOpenPayload) => ({payload, type: incomingShareOpen})
 export const createInstallFuse = (payload: _InstallFusePayload) => ({payload, type: installFuse})
 export const createInstallFuseResult = (payload: _InstallFuseResultPayload) => ({payload, type: installFuseResult})
 export const createInstallKBFS = (payload: _InstallKBFSPayload) => ({payload, type: installKBFS})
@@ -234,7 +237,7 @@ export const createUserFileEditsLoaded = (payload: _UserFileEditsLoadedPayload) 
 // Action Payloads
 export type CancelDownloadPayload = {|+payload: _CancelDownloadPayload, +type: 'fs:cancelDownload'|}
 export type ClearRefreshTagPayload = {|+payload: _ClearRefreshTagPayload, +type: 'fs:clearRefreshTag'|}
-export type CloseMoveOrCopyPayload = {|+payload: _CloseMoveOrCopyPayload, +type: 'fs:closeMoveOrCopy'|}
+export type CloseDestinationPickerPayload = {|+payload: _CloseDestinationPickerPayload, +type: 'fs:closeDestinationPicker'|}
 export type CommitEditPayload = {|+payload: _CommitEditPayload, +type: 'fs:commitEdit'|}
 export type CopyPayload = {|+payload: _CopyPayload, +type: 'fs:copy'|}
 export type DeleteFilePayload = {|+payload: _DeleteFilePayload, +type: 'fs:deleteFile'|}
@@ -257,6 +260,7 @@ export type FolderListLoadedPayload = {|+payload: _FolderListLoadedPayload, +typ
 export type FsErrorPayload = {|+payload: _FsErrorPayload, +type: 'fs:fsError'|}
 export type FuseStatusPayload = {|+payload: _FuseStatusPayload, +type: 'fs:fuseStatus'|}
 export type FuseStatusResultPayload = {|+payload: _FuseStatusResultPayload, +type: 'fs:fuseStatusResult'|}
+export type IncomingShareOpenPayload = {|+payload: _IncomingShareOpenPayload, +type: 'fs:incomingShareOpen'|}
 export type InstallFusePayload = {|+payload: _InstallFusePayload, +type: 'fs:installFuse'|}
 export type InstallFuseResultPayload = {|+payload: _InstallFuseResultPayload, +type: 'fs:installFuseResult'|}
 export type InstallKBFSPayload = {|+payload: _InstallKBFSPayload, +type: 'fs:installKBFS'|}
@@ -310,7 +314,7 @@ export type UserFileEditsLoadedPayload = {|+payload: _UserFileEditsLoadedPayload
 export type Actions =
   | CancelDownloadPayload
   | ClearRefreshTagPayload
-  | CloseMoveOrCopyPayload
+  | CloseDestinationPickerPayload
   | CommitEditPayload
   | CopyPayload
   | DeleteFilePayload
@@ -333,6 +337,7 @@ export type Actions =
   | FsErrorPayload
   | FuseStatusPayload
   | FuseStatusResultPayload
+  | IncomingShareOpenPayload
   | InstallFusePayload
   | InstallFuseResultPayload
   | InstallKBFSPayload
