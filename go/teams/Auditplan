@@ -4,11 +4,7 @@ Audit correctness tests - the summary calculators!
 NEEED WAY MORE LOGGING!
 clean up box_audit.go
 TEST for upgrade path - force reload
-put the permanent in noclean
 switch to OK with corruptions for release. - in TODO
-skip for open team ...
-we don't actually disable the audit when env disabled RN. should still do bg tasks?
-REBASE
 
 LOWPRI
 I wonder if we need some way for TeamBoxAudit to return an attempt's result regardless if retryable...or just some keybase1Audit{} that embds an Attempt
@@ -25,3 +21,4 @@ wow resets do NOT play well.
 BTW need to check LRU Cache is OK, in addition to the DB...
 And also should check that other public methods...fml
 and maybe some private ones
+OPEN TEAM TEST

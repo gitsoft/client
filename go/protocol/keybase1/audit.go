@@ -32,26 +32,29 @@ func (o BoxPublicSummary) DeepCopy() BoxPublicSummary {
 type BoxAuditAttemptResult int
 
 const (
-	BoxAuditAttemptResult_FAILURE_RETRYABLE        BoxAuditAttemptResult = 0
-	BoxAuditAttemptResult_FAILURE_MALICIOUS_SERVER BoxAuditAttemptResult = 1
-	BoxAuditAttemptResult_OK_VERIFIED              BoxAuditAttemptResult = 2
-	BoxAuditAttemptResult_OK_NOT_ATTEMPTED         BoxAuditAttemptResult = 3
+	BoxAuditAttemptResult_FAILURE_RETRYABLE         BoxAuditAttemptResult = 0
+	BoxAuditAttemptResult_FAILURE_MALICIOUS_SERVER  BoxAuditAttemptResult = 1
+	BoxAuditAttemptResult_OK_VERIFIED               BoxAuditAttemptResult = 2
+	BoxAuditAttemptResult_OK_NOT_ATTEMPTED_ROLE     BoxAuditAttemptResult = 3
+	BoxAuditAttemptResult_OK_NOT_ATTEMPTED_OPENTEAM BoxAuditAttemptResult = 4
 )
 
 func (o BoxAuditAttemptResult) DeepCopy() BoxAuditAttemptResult { return o }
 
 var BoxAuditAttemptResultMap = map[string]BoxAuditAttemptResult{
-	"FAILURE_RETRYABLE":        0,
-	"FAILURE_MALICIOUS_SERVER": 1,
-	"OK_VERIFIED":              2,
-	"OK_NOT_ATTEMPTED":         3,
+	"FAILURE_RETRYABLE":         0,
+	"FAILURE_MALICIOUS_SERVER":  1,
+	"OK_VERIFIED":               2,
+	"OK_NOT_ATTEMPTED_ROLE":     3,
+	"OK_NOT_ATTEMPTED_OPENTEAM": 4,
 }
 
 var BoxAuditAttemptResultRevMap = map[BoxAuditAttemptResult]string{
 	0: "FAILURE_RETRYABLE",
 	1: "FAILURE_MALICIOUS_SERVER",
 	2: "OK_VERIFIED",
-	3: "OK_NOT_ATTEMPTED",
+	3: "OK_NOT_ATTEMPTED_ROLE",
+	4: "OK_NOT_ATTEMPTED_OPENTEAM",
 }
 
 func (e BoxAuditAttemptResult) String() string {

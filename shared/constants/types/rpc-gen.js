@@ -17,7 +17,8 @@ export const auditBoxAuditAttemptResult = {
   failureRetryable: 0,
   failureMaliciousServer: 1,
   okVerified: 2,
-  okNotAttempted: 3,
+  okNotAttemptedRole: 3,
+  okNotAttemptedOpenteam: 4,
 }
 
 export const backendCommonBlockType = {

@@ -1049,7 +1049,8 @@ export const auditBoxAuditAttemptResult = {
   failureRetryable: 0,
   failureMaliciousServer: 1,
   okVerified: 2,
-  okNotAttempted: 3,
+  okNotAttemptedRole: 3,
+  okNotAttemptedOpenteam: 4,
 }
 
 export const backendCommonBlockType = {
@@ -1983,7 +1984,8 @@ export type BoxAuditAttemptResult =
   | 0 // FAILURE_RETRYABLE_0
   | 1 // FAILURE_MALICIOUS_SERVER_1
   | 2 // OK_VERIFIED_2
-  | 3 // OK_NOT_ATTEMPTED_3
+  | 3 // OK_NOT_ATTEMPTED_ROLE_3
+  | 4 // OK_NOT_ATTEMPTED_OPENTEAM_4
 
 export type BoxNonce = ?string
 export type BoxPublicKey = ?string

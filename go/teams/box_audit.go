@@ -100,7 +100,7 @@ func NewBoxAuditor(g *libkb.GlobalContext) *BoxAuditor {
 
 func NewBoxAuditorAndInstall(g *libkb.GlobalContext) {
 	if g.GetEnv().GetDisableTeamBoxAuditor() {
-		g.Log.CDebugf(context.TODO(), "Box auditor disabled: not configuring auditor")
+		g.Log.CWarningf(context.TODO(), "Box auditor disabled: using dummy auditor")
 		g.SetTeamBoxAuditor(DummyBoxAuditor{})
 	} else {
 		g.SetTeamBoxAuditor(NewBoxAuditor(g))
@@ -248,7 +248,7 @@ func (a *BoxAuditor) RetryNextBoxAudit(mctx libkb.MetaContext) error {
 
 // BoxAuditRandomTeam selects a random known team from the cache, including
 // implicit teams, and audits it. It may succeed trivially because, for example, user is a reader
-// and so does not have permissions to do a box audit (keybase1.BoxAuditAttemptResult_OK_NOT_ATTEMPTED)
+// and so does not have permissions to do a box audit (keybase1.BoxAuditAttemptResult_OK_NOT_ATTEMPTED_*)
 func (a *BoxAuditor) BoxAuditRandomTeam(mctx libkb.MetaContext) error {
 	mctx = mctx.WithLogTag(BoxAuditTag)
 
@@ -339,14 +339,13 @@ func (a *BoxAuditor) attemptLocked(mctx libkb.MetaContext, teamID keybase1.TeamI
 	// TODO put a teamchain seqno instead of generation?
 	attempt.Generation = &g
 
-	// TODO SHOULDNT audit if Open
-	shouldAudit, err := a.shouldAudit(mctx, *team)
+	shouldAudit, shouldAuditResult, err := a.shouldAudit(mctx, *team)
 	if err != nil {
 		attempt.Error = getErrorMessage(err)
 		return attempt
 	}
 	if !shouldAudit {
-		attempt.Result = keybase1.BoxAuditAttemptResult_OK_NOT_ATTEMPTED
+		attempt.Result = *shouldAuditResult
 		return attempt
 	}
 
@@ -521,7 +520,7 @@ func (d DummyBoxAuditor) BoxAuditRandomTeam(libkb.MetaContext) error            
 func (d DummyBoxAuditor) BoxAuditTeam(libkb.MetaContext, keybase1.TeamID) error { return nil }
 func (d DummyBoxAuditor) Attempt(libkb.MetaContext, keybase1.TeamID, bool) keybase1.BoxAuditAttempt {
 	return keybase1.BoxAuditAttempt{
-		Result: keybase1.BoxAuditAttemptResult_OK_NOT_ATTEMPTED,
+		Result: keybase1.BoxAuditAttemptResult_OK_NOT_ATTEMPTED_ROLE,
 		Ctime:  keybase1.ToUnixTime(time.Now()),
 	}
 }
@@ -638,13 +637,21 @@ func NewBoxAuditJail(version Version) *BoxAuditJail {
 
 //////////////////////////// STATELESS (except for rotate)
 
-func (a *BoxAuditor) shouldAudit(mctx libkb.MetaContext, team Team) (bool, error) {
+func (a *BoxAuditor) shouldAudit(mctx libkb.MetaContext, team Team) (bool, *keybase1.BoxAuditAttemptResult, error) {
+	if team.IsOpen() {
+		res := keybase1.BoxAuditAttemptResult_OK_NOT_ATTEMPTED_OPENTEAM
+		return false, &res, nil
+	}
 	role, err := team.MemberRole(mctx.Ctx(), mctx.CurrentUserVersion())
 	if err != nil {
-		return false, err
+		return false, nil, err
+	}
+	if !role.IsOrAbove(keybase1.TeamRole_WRITER) {
+		res := keybase1.BoxAuditAttemptResult_OK_NOT_ATTEMPTED_ROLE
+		return false, &res, nil
 	}
 
-	return role.IsOrAbove(keybase1.TeamRole_WRITER), nil
+	return true, nil, nil
 }
 
 // loadTeamForBoxAudit loads a team once, but if the client

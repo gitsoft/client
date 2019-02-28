@@ -2677,5 +2677,10 @@ func (h BoxSummaryHash) String() string {
 }
 
 func (r BoxAuditAttemptResult) IsOK() bool {
-	return r == BoxAuditAttemptResult_OK_VERIFIED || r == BoxAuditAttemptResult_OK_NOT_ATTEMPTED
+	switch r {
+	case BoxAuditAttemptResult_OK_VERIFIED, BoxAuditAttemptResult_OK_NOT_ATTEMPTED_ROLE, BoxAuditAttemptResult_OK_NOT_ATTEMPTED_OPENTEAM:
+		return true
+	default:
+		return false
+	}
 }
