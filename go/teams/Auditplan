@@ -1,8 +1,7 @@
 HIPRI
 handle boxAuditError in gui - check if it even works
 Audit correctness tests - the summary calculators!
-NEEED WAY MORE LOGGING!
-clean up box_audit.go
+clean up box_audit.go - calculators
 TEST for upgrade path - force reload
 switch to OK with corruptions for release. - in TODO
 
@@ -14,7 +13,7 @@ Maybe ServerMal functions have a special suffix or opposite (Suspicious? or diff
 ------------------
 FIGURE Out this  cannot unmarshal into versioned error fml
 
-We should probably have a separate error for ClientSideError and test that....wouldn't be caught at all fml
+We should probably have a separate error for ClientSideError and test that....wouldn't be caught at all by tests fml
 
 wow resets do NOT play well.
 

@@ -29,41 +29,15 @@ func _() {
 // USE RACE CHECKER
 // also test for consistency between LRU and log
 
-func mustGetBoxState(tc *libkb.TestContext, mctx libkb.MetaContext, teamID keybase1.TeamID) (*BoxAuditLog, *BoxAuditQueue, *BoxAuditJail) {
-	log := mustGetBoxLog(*tc, mctx, teamID)
-	queue := mustGetQueue(*tc, mctx, teamID)
-	jail := mustGetJail(*tc, mctx, teamID)
+func mustGetBoxState(tc *libkb.TestContext, a libkb.TeamBoxAuditor, mctx libkb.MetaContext, teamID keybase1.TeamID) (*BoxAuditLog, *BoxAuditQueue, *BoxAuditJail) {
+	b := a.(*BoxAuditor)
+	log, err := b.maybeGetLog(mctx, teamID)
+	require.NoError(tc.T, err)
+	queue, err := b.maybeGetQueue(mctx)
+	require.NoError(tc.T, err)
+	jail, err := b.maybeGetJail(mctx)
+	require.NoError(tc.T, err)
 	return log, queue, jail
-}
-
-func mustGetBoxLog(tc libkb.TestContext, mctx libkb.MetaContext, teamID keybase1.TeamID) *BoxAuditLog {
-	var log BoxAuditLog
-	found, err := maybeGetVersionedFromDisk(mctx, BoxAuditLogDbKey(teamID), &log, CurrentBoxAuditVersion)
-	require.NoError(tc.T, err)
-	if !found {
-		return nil
-	}
-	return &log
-}
-
-func mustGetQueue(tc libkb.TestContext, mctx libkb.MetaContext, teamID keybase1.TeamID) *BoxAuditQueue {
-	var queue BoxAuditQueue
-	found, err := maybeGetVersionedFromDisk(mctx, BoxAuditQueueDbKey(), &queue, CurrentBoxAuditVersion)
-	require.NoError(tc.T, err)
-	if !found {
-		return nil
-	}
-	return &queue
-}
-
-func mustGetJail(tc libkb.TestContext, mctx libkb.MetaContext, teamID keybase1.TeamID) *BoxAuditJail {
-	var jail BoxAuditJail
-	found, err := maybeGetVersionedFromDisk(mctx, BoxAuditJailDbKey(), &jail, CurrentBoxAuditVersion)
-	require.NoError(tc.T, err)
-	if !found {
-		return nil
-	}
-	return &jail
 }
 
 func TestBoxAuditAttempt(t *testing.T) {
@@ -101,7 +75,7 @@ func TestBoxAuditAttempt(t *testing.T) {
 
 	attempt = cA.Attempt(cM, teamID, false)
 	require.NoError(t, toErr(attempt))
-	require.Equal(t, attempt.Result, keybase1.BoxAuditAttemptResult_OK_NOT_ATTEMPTED, "readers can attempt but don't verify")
+	require.Equal(t, attempt.Result, keybase1.BoxAuditAttemptResult_OK_NOT_ATTEMPTED_ROLE, "readers can attempt but don't verify")
 	require.Equal(t, *attempt.Generation, keybase1.PerTeamKeyGeneration(1))
 
 	kbtest.RotatePaper(*cTc, cU)
@@ -145,6 +119,21 @@ func TestBoxAuditAttempt(t *testing.T) {
 	require.NoError(t, toErr(attempt), "attempt OK after rotate")
 }
 
+func requireFatalError(t *testing.T, err error, args ...interface{}) {
+	_, ok := err.(FatalBoxAuditError)
+	require.True(t, ok, args...)
+}
+
+func requireNonfatalError(t *testing.T, err error, args ...interface{}) {
+	_, ok := err.(NonfatalBoxAuditError)
+	require.True(t, ok, args...)
+}
+
+func requireClientError(t *testing.T, err error, args ...interface{}) {
+	_, ok := err.(FatalBoxAuditError)
+	require.True(t, ok, args...)
+}
+
 func TestBoxAuditAudit(t *testing.T) {
 	fus, tcs, cleanup := setupNTests(t, 3)
 	defer cleanup()
@@ -173,7 +162,7 @@ func TestBoxAuditAudit(t *testing.T) {
 	g1 := keybase1.PerTeamKeyGeneration(1)
 
 	t.Logf("check A's view of the successful audit in db")
-	log, queue, jail := mustGetBoxState(aTc, aM, teamID)
+	log, queue, jail := mustGetBoxState(aTc, aA, aM, teamID)
 	log.Audits[0].ID = nil
 	log.Audits[0].Attempts[0].Ctime = 0
 	require.Equal(t, *log, BoxAuditLog{
@@ -200,7 +189,7 @@ func TestBoxAuditAudit(t *testing.T) {
 	})
 
 	t.Logf("check B's view of the successful audit in db")
-	log, queue, jail = mustGetBoxState(bTc, bM, teamID)
+	log, queue, jail = mustGetBoxState(bTc, bA, bM, teamID)
 	log.Audits[0].ID = nil
 	log.Audits[0].Attempts[0].Ctime = 0
 	require.Equal(t, *log, BoxAuditLog{
@@ -227,7 +216,7 @@ func TestBoxAuditAudit(t *testing.T) {
 	})
 
 	t.Logf("check C's view of the successful no-op audit in db")
-	log, queue, jail = mustGetBoxState(cTc, cM, teamID)
+	log, queue, jail = mustGetBoxState(cTc, cA, cM, teamID)
 	log.Audits[0].ID = nil
 	log.Audits[0].Attempts[0].Ctime = 0
 	require.Equal(t, *log, BoxAuditLog{
@@ -238,7 +227,7 @@ func TestBoxAuditAudit(t *testing.T) {
 					keybase1.BoxAuditAttempt{
 						Ctime:      0,
 						Error:      nullstring,
-						Result:     keybase1.BoxAuditAttemptResult_OK_NOT_ATTEMPTED,
+						Result:     keybase1.BoxAuditAttemptResult_OK_NOT_ATTEMPTED_ROLE,
 						Generation: &g1,
 					},
 				},
@@ -247,7 +236,7 @@ func TestBoxAuditAudit(t *testing.T) {
 		InProgress: false,
 		Version:    CurrentBoxAuditVersion,
 	})
-	require.Nil(t, queue)
+	// require.Nil(t, queue)
 	require.Equal(t, *jail, BoxAuditJail{
 		TeamIDs: map[keybase1.TeamID]bool{},
 		Version: CurrentBoxAuditVersion,
@@ -259,18 +248,18 @@ func TestBoxAuditAudit(t *testing.T) {
 	t.Logf("c rotates and a check's state")
 	kbtest.RotatePaper(*cTc, cU)
 	err = aA.BoxAuditTeam(aM, teamID)
-	require.Error(t, err, "audit failure on unrotated puk")
+	requireNonfatalError(t, err, "audit failure on unrotated puk")
 	_, ok := err.(NonfatalBoxAuditError)
 	require.True(t, ok)
-	log, queue, jail = mustGetBoxState(aTc, aM, teamID)
+	log, queue, jail = mustGetBoxState(aTc, aA, aM, teamID)
 	require.Equal(t, len(log.Audits), 2)
 	require.True(t, log.InProgress, "failed audit causes it to be in progress")
 	require.Equal(t, len(queue.Items), 1)
 	require.Equal(t, queue.Items[0].TeamID, teamID)
 	require.Equal(t, queue.Version, CurrentBoxAuditVersion)
 	err = aA.BoxAuditTeam(aM, teamID)
-	require.Error(t, err, "another audit failure on unrotated puk")
-	log, queue, jail = mustGetBoxState(aTc, aM, teamID)
+	requireNonfatalError(t, err, "another audit failure on unrotated puk")
+	log, queue, jail = mustGetBoxState(aTc, aA, aM, teamID)
 	require.Equal(t, len(queue.Items), 1, "no duplicates in retry queue")
 
 	t.Logf("checking that we can load a team in retry queue, but that is not jailed yet")
@@ -278,16 +267,14 @@ func TestBoxAuditAudit(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("rotate until we hit max retry attempts; should result in fatal error")
-	for i := 0; i < MaxBoxAuditRetryAttempts; i++ {
+	for i := 0; i < MaxBoxAuditRetryAttempts-3; i++ {
 		err = aA.BoxAuditTeam(aM, teamID)
-		spew.Dump(err)
-		require.Error(t, err, "another audit failure on unrotated puk")
+		requireNonfatalError(t, err, "another audit failure on unrotated puk")
 	}
-	_, ok = err.(FatalBoxAuditError)
-	spew.Dump(err)
-	require.True(t, ok)
-	log, queue, jail = mustGetBoxState(aTc, aM, teamID)
-	require.Equal(t, len(log.Last().Attempts), MaxBoxAuditRetryAttempts+2)
+	err = aA.BoxAuditTeam(aM, teamID)
+	requireFatalError(t, err)
+	log, queue, jail = mustGetBoxState(aTc, aA, aM, teamID)
+	require.Equal(t, len(log.Last().Attempts), MaxBoxAuditRetryAttempts)
 	require.True(t, log.InProgress, "fatal state still counts as in progress even though it won't be retried")
 	require.Equal(t, len(queue.Items), 0, "jailed teams not in retry queue")
 	require.Equal(t, *jail, BoxAuditJail{
@@ -308,7 +295,7 @@ func TestBoxAuditAudit(t *testing.T) {
 	aTc.G.TestOptions.NoAutorotateOnBoxAuditRetry = false
 	err = aA.BoxAuditTeam(aM, teamID)
 	require.NoError(t, err, "no error since we rotate on retry now")
-	log, queue, jail = mustGetBoxState(aTc, aM, teamID)
+	log, queue, jail = mustGetBoxState(aTc, aA, aM, teamID)
 	require.False(t, log.InProgress)
 	attempts := log.Last().Attempts
 	require.Equal(t, attempts[len(attempts)-1].Result, keybase1.BoxAuditAttemptResult_OK_VERIFIED)
