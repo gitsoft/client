@@ -1,6 +1,6 @@
 HIPRI
 handle boxAuditError in gui - check if it even works
-Audit correctness tests.
+Audit correctness tests - the summary calculators!
 NEEED WAY MORE LOGGING!
 clean up box_audit.go
 TEST for upgrade path - force reload
@@ -22,3 +22,6 @@ We should probably have a separate error for ClientSideError and test that....wo
 
 wow resets do NOT play well.
 
+BTW need to check LRU Cache is OK, in addition to the DB...
+And also should check that other public methods...fml
+and maybe some private ones
