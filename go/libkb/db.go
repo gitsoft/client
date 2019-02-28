@@ -20,8 +20,8 @@ const (
 	DBTeamChain         = 0x10
 	DBUserPlusAllKeysV1 = 0x19
 
-	DBBoxAuditorPermanent      = 0xbd
-	DBBoxAuditor               = 0xbe
+	DBBoxAuditorPermanent      = 0xbc
+	DBBoxAuditor               = 0xbd
 	DBOfflineRPC               = 0xbe
 	DBChatCollapses            = 0xbf
 	DBMerkleAudit              = 0xca
@@ -102,7 +102,8 @@ func IsPermDbKey(typ ObjType) bool {
 		DBOfflineRPC,
 		DBChatCollapses,
 		DBHasRandomPW,
-		DBStellarDisclaimer:
+		DBStellarDisclaimer,
+		DBBoxAuditorPermanent:
 		return true
 	default:
 		return false
