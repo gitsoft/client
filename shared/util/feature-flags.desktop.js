@@ -11,6 +11,7 @@ let features = (featureFlagsOverride && featureFlagsOverride.split(',')) || []
 const featureOn = (key: $Keys<FeatureFlags>) => features.includes(key)
 
 const ff: FeatureFlags = {
+  addIdentity: __DEV__,
   admin: false,
   airdrop: false,
   chatIndexProfilingEnabled: false,

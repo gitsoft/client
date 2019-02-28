@@ -1,5 +1,6 @@
 // @flow strict
 export type FeatureFlags = {|
+  addIdentity: boolean,
   admin: boolean,
   airdrop: boolean,
   chatIndexProfilingEnabled: boolean,

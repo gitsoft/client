@@ -25,6 +25,7 @@ export type Props = {|
   followersCount: ?number,
   following: Array<string>,
   followingCount: ?number,
+  onAddIdentity: ?() => void,
   onBack: () => void,
   onReload: () => void,
   onSearch: () => void,
@@ -197,6 +198,7 @@ class FriendRow extends React.Component<FriendRowProps> {
 }
 
 type BioTeamProofsProps = {|
+  onAddIdentity: ?() => void,
   assertionKeys: ?Array<string>,
   backgroundColorType: BackgroundColorType,
   onEditAvatar: ?() => void,
@@ -250,6 +252,17 @@ class BioTeamProofs extends React.PureComponent<BioTeamProofsProps> {
           </Kb.Text>
           <Teams username={this.props.username} />
           <Proofs {...this.props} />
+          {flags.addIdentity && (
+            <Kb.Box2 direction="horizontal" style={styles.addIdentityContainer}>
+              <Kb.Button
+                label="Add other identities"
+                labelStyle={styles.label}
+                onClick={this.props.onAddIdentity}
+                style={styles.addIdentityButton}
+                type="Secondary"
+              />
+            </Kb.Box2>
+          )}
           <Folders profileUsername={this.props.username} />
         </Kb.Box2>
       </Kb.Box2>
@@ -320,6 +333,7 @@ class User extends React.Component<Props, State> {
     data: ['bioTeamProofs'],
     renderItem: () => (
       <BioTeamProofs
+        onAddIdentity={this.props.onAddIdentity}
         assertionKeys={this.props.assertionKeys}
         backgroundColorType={this.props.backgroundColorType}
         username={this.props.username}
@@ -399,6 +413,13 @@ const avatarSize = 128
 const headerHeight = Styles.isMobile ? 48 : 72
 
 const styles = Styles.styleSheetCreate({
+  addIdentityButton: {
+    marginBottom: Styles.globalMargins.xsmall,
+    marginTop: Styles.globalMargins.xsmall,
+  },
+  addIdentityContainer: {
+    justifyContent: 'center',
+  },
   backButton: {color: Styles.globalColors.white},
   backgroundColor: {
     ...Styles.globalStyles.fillAbsolute,
@@ -484,6 +505,9 @@ const styles = Styles.styleSheetCreate({
   }),
   innerContainer: {...Styles.globalStyles.fillAbsolute},
   invisible: {opacity: 0},
+  label: {
+    color: Styles.globalColors.black_75,
+  },
   noGrow: {flexGrow: 0},
   proofs: Styles.platformStyles({
     isElectron: {

@@ -7,6 +7,7 @@ if (!__STORYBOOK__) {
 }
 
 const ff: FeatureFlags = {
+  addIdentity: true,
   admin: false,
   airdrop: true,
   chatIndexProfilingEnabled: false,
