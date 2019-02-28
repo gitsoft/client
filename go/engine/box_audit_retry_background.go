@@ -67,7 +67,7 @@ func (e *BoxAuditRetryBackground) Shutdown() {
 func BoxAuditRetryBackgroundRound(mctx libkb.MetaContext) error {
 	g := mctx.G()
 	if !g.ActiveDevice.Valid() {
-		mctx.CDebugf("BoxAuditRetryBackgroundRound; not logged in")
+		mctx.Debug("BoxAuditRetryBackgroundRound; not logged in")
 		return nil
 	}
 

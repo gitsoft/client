@@ -857,7 +857,7 @@ func (d *Service) runBackgroundBoxAuditRetry() {
 		m := libkb.NewMetaContextBackground(d.G())
 		err := engine.RunEngine2(m, eng)
 		if err != nil {
-			m.CWarningf("background BoxAuditorRetry error: %v", err)
+			m.Warning("background BoxAuditorRetry error: %v", err)
 		}
 	}()
 
@@ -874,7 +874,7 @@ func (d *Service) runBackgroundBoxAuditScheduler() {
 		m := libkb.NewMetaContextBackground(d.G())
 		err := engine.RunEngine2(m, eng)
 		if err != nil {
-			m.CWarningf("background BoxAuditorScheduler error: %v", err)
+			m.Warning("background BoxAuditorScheduler error: %v", err)
 		}
 	}()
 

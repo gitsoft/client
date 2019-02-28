@@ -67,7 +67,7 @@ func (e *BoxAuditSchedulerBackground) Shutdown() {
 func BoxAuditSchedulerBackgroundRound(mctx libkb.MetaContext) error {
 	g := mctx.G()
 	if !g.ActiveDevice.Valid() {
-		mctx.CDebugf("BoxAuditSchedulerBackgroundRound; not logged in")
+		mctx.Debug("BoxAuditSchedulerBackgroundRound; not logged in")
 		return nil
 	}
 

@@ -278,7 +278,7 @@ func (a *BoxAuditor) isInJailLocked(mctx libkb.MetaContext, teamID keybase1.Team
 		if ok {
 			return valBool, nil
 		}
-		mctx.CErrorf("Bad boolean type assertion in IsInJail LRU for %s", teamID)
+		mctx.Error("Bad boolean type assertion in IsInJail LRU for %s", teamID)
 		// Fall through to disk if the LRU is corrupted
 
 		// TODO: remove next line for release
@@ -362,9 +362,9 @@ func (a *BoxAuditor) attemptLocked(mctx libkb.MetaContext, teamID keybase1.TeamI
 	}
 
 	if !bytes.Equal(expectedSummary.Hash(), actualSummary.Hash()) {
-		mctx.CWarningf("Box audit summary mismatch")
-		mctx.CWarningf("Server summary: %+v", expectedSummary.table)
-		mctx.CWarningf("Client summary: %+v", actualSummary.table)
+		mctx.Warning("Box audit summary mismatch")
+		mctx.Warning("Server summary: %+v", expectedSummary.table)
+		mctx.Warning("Client summary: %+v", actualSummary.table)
 
 		attempt.Error = getErrorMessage(fmt.Errorf("box summary hash mismatch"))
 		return attempt
@@ -711,7 +711,7 @@ func calculateExpectedSummary(mctx libkb.MetaContext, team *Team) (boxPublicSumm
 			}
 			puk := upak.Current.GetLatestPerUserKey()
 			if puk == nil {
-				mctx.CWarningf("skipping user %s who has no per-user-key; possibly reset", uv)
+				mctx.Warning("skipping user %s who has no per-user-key; possibly reset", uv)
 				continue
 			}
 			d[uv] = *puk
@@ -878,7 +878,7 @@ type Versioned interface {
 func maybeGetVersionedFromDisk(mctx libkb.MetaContext, dbKey libkb.DbKey, i Versioned, currentVersion Version) (found bool, err error) {
 	found, err = mctx.G().LocalDb.GetInto(&i, dbKey)
 	if err != nil {
-		mctx.CWarningf("Failed to unmarshal from db for key %+v: %s", dbKey, err)
+		mctx.Warning("Failed to unmarshal from db for key %+v: %s", dbKey, err)
 		return false, err
 	}
 	if !found {
@@ -888,11 +888,11 @@ func maybeGetVersionedFromDisk(mctx libkb.MetaContext, dbKey libkb.DbKey, i Vers
 	if !ok {
 		return false, fmt.Errorf("failed to cast %+v as a Versioned", i)
 		// TODO: switch to below
-		// m.CErrorf("Bad type assertion in maybeGetVersionedFromDisk for %s @ %d", dbKey, currentVersion)
+		// m.Error("Bad type assertion in maybeGetVersionedFromDisk for %s @ %d", dbKey, currentVersion)
 		// return nil, nil
 	}
 	if v.GetVersion() != currentVersion {
-		mctx.CDebugf("Not returning outdated obj at version %d (now at version %d)", v.GetVersion(), currentVersion)
+		mctx.Debug("Not returning outdated obj at version %d (now at version %d)", v.GetVersion(), currentVersion)
 		// We do not delete the old data.
 		return false, nil
 	}
