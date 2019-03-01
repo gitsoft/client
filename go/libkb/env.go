@@ -1156,6 +1156,7 @@ func (e *Env) GetEmailOrUsername() string {
 }
 
 func (e *Env) GetRunMode() RunMode {
+
 	// If testing production run mode, then use it:
 	if e.Test.UseProductionRunMode {
 		return ProductionRunMode

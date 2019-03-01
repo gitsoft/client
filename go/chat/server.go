@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand" // xxx do not merge
 	"regexp"
 	"sort"
 	"strconv"
@@ -1240,6 +1241,33 @@ func (h *Server) runStellarSendUI(ctx context.Context, sessionID int, uid gregor
 	}()
 	uiSummary, toSend, err := h.G().StellarSender.DescribePayments(ctx, uid, convID, parsedPayments)
 	if err != nil {
+
+		// xxx do not merge
+		// xxx do not merge
+		// xxx do not merge
+		// xxx do not merge
+		// xxx do not merge
+		// xxx do not merge
+		// xxx do not merge
+		// xxx do not merge
+		// xxx do not merge
+		// xxx do not merge
+		// xxx do not merge
+		if rand.Intn(2) == 0 {
+			err = fmt.Errorf("bad news something actually went awry: 0xHEEBEEGEEBEES")
+		}
+		// xxx do not merge
+		// xxx do not merge
+		// xxx do not merge
+		// xxx do not merge
+		// xxx do not merge
+		// xxx do not merge
+		// xxx do not merge
+		// xxx do not merge
+		// xxx do not merge
+		// xxx do not merge
+		// xxx do not merge
+
 		if err := libkb.ExportErrorAsStatus(h.G().GlobalContext, err); err != nil {
 			ui.ChatStellarDataError(ctx, *err)
 		} else {
