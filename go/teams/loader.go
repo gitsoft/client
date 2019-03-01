@@ -308,7 +308,8 @@ func (l *TeamLoader) load1(ctx context.Context, me keybase1.UserVersion, lArg ke
 		}
 	}
 
-	if !lArg.SkipBoxAuditCheck {
+	shouldSkip, ok := ctx.Value(SkipBoxAuditCheckContextKey).(bool)
+	if !(ok && shouldSkip) {
 		mctx := libkb.NewMetaContext(ctx, l.G())
 		err = l.G().GetTeamBoxAuditor().AssertUnjailedOrReaudit(mctx, teamID)
 		if err != nil {

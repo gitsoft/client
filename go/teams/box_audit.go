@@ -28,6 +28,8 @@ const BoxAuditTag = "BOXAUD"
 const MaxBoxAuditQueueSize = 100
 const MaxBoxAuditLogSize = 10
 
+const SkipBoxAuditCheckContextKey = "skip-box-audit-check"
+
 /////////////////// METHODS
 
 type ClientBoxAuditError struct {
@@ -124,6 +126,12 @@ func NewBoxAuditorAndInstall(g *libkb.GlobalContext) {
 	}
 }
 
+func (a *BoxAuditor) initMctx(mctx libkb.MetaContext) libkb.MetaContext {
+	mctx = mctx.WithLogTag(BoxAuditTag)
+	mctx = mctx.WithCtx(context.WithValue(mctx.Ctx(), SkipBoxAuditCheckContextKey, true))
+	return mctx
+}
+
 // BoxAuditTeam performs one attempt of a BoxAudit. If one is in progress for
 // the teamid, make a new attempt. If exceeded max tries or hit a malicious
 // error, return a fatal error.  Otherwise, make a new audit and fill it with
@@ -133,7 +141,7 @@ func NewBoxAuditorAndInstall(g *libkb.GlobalContext) {
 // write error, we retry it as well but distinguish it from a failure the server
 // could have possibly maliciously caused.
 func (a *BoxAuditor) BoxAuditTeam(mctx libkb.MetaContext, teamID keybase1.TeamID) (err error) {
-	mctx = mctx.WithLogTag(BoxAuditTag)
+	mctx = a.initMctx(mctx)
 	defer mctx.TraceTimed(fmt.Sprintf("BoxAuditTeam(%s)", teamID), func() error { return err })()
 	lock := a.locktab.AcquireOnName(mctx.Ctx(), mctx.G(), teamID.String())
 	defer lock.Release(mctx.Ctx())
@@ -234,7 +242,7 @@ func (a *BoxAuditor) boxAuditTeamLocked(mctx libkb.MetaContext, teamID keybase1.
 }
 
 func (a *BoxAuditor) AssertUnjailedOrReaudit(mctx libkb.MetaContext, teamID keybase1.TeamID) (err error) {
-	mctx = mctx.WithLogTag(BoxAuditTag)
+	mctx = a.initMctx(mctx)
 	defer mctx.TraceTimed("AssertUnjailedOrReaudit", func() error { return err })()
 	lock := a.locktab.AcquireOnName(mctx.Ctx(), mctx.G(), teamID.String())
 	defer lock.Release(mctx.Ctx())
@@ -260,7 +268,7 @@ func (a *BoxAuditor) assertUnjailedOrReauditLocked(mctx libkb.MetaContext, teamI
 
 // RetryNextBoxAudit selects a teamID from the box audit retry queue and performs another box audit.
 func (a *BoxAuditor) RetryNextBoxAudit(mctx libkb.MetaContext) (err error) {
-	mctx = mctx.WithLogTag(BoxAuditTag)
+	mctx = a.initMctx(mctx)
 	defer mctx.TraceTimed("RetryNextBoxAudit", func() error { return err })()
 	queueItem, err := a.popRetryQueue(mctx)
 	if err != nil {
@@ -277,7 +285,7 @@ func (a *BoxAuditor) RetryNextBoxAudit(mctx libkb.MetaContext) (err error) {
 // implicit teams, and audits it. It may succeed trivially because, for example, user is a reader
 // and so does not have permissions to do a box audit (keybase1.BoxAuditAttemptResult_OK_NOT_ATTEMPTED_*)
 func (a *BoxAuditor) BoxAuditRandomTeam(mctx libkb.MetaContext) (err error) {
-	mctx = mctx.WithLogTag(BoxAuditTag)
+	mctx = a.initMctx(mctx)
 	defer mctx.TraceTimed("BoxAuditRandomTeam", func() error { return err })()
 
 	teamID, err := randomKnownTeamID(mctx)
@@ -293,7 +301,7 @@ func (a *BoxAuditor) BoxAuditRandomTeam(mctx libkb.MetaContext) (err error) {
 }
 
 func (a *BoxAuditor) IsInJail(mctx libkb.MetaContext, teamID keybase1.TeamID) (inJail bool, err error) {
-	mctx = mctx.WithLogTag(BoxAuditTag)
+	mctx = a.initMctx(mctx)
 	defer mctx.TraceTimed(fmt.Sprintf("IsInJail(%s)", teamID), func() error { return err })()
 	lock := a.locktab.AcquireOnName(mctx.Ctx(), mctx.G(), teamID.String())
 	defer lock.Release(mctx.Ctx())
@@ -333,7 +341,7 @@ func (a *BoxAuditor) isInJailLocked(mctx libkb.MetaContext, teamID keybase1.Team
 // persistent state to disk related to the box audit, but it may, e.g.,
 // refresh the team cache since it loads that.
 func (a *BoxAuditor) Attempt(mctx libkb.MetaContext, teamID keybase1.TeamID, rotateBeforeAudit bool) (attempt keybase1.BoxAuditAttempt) {
-	mctx = mctx.WithLogTag(BoxAuditTag)
+	mctx = a.initMctx(mctx)
 	defer mctx.TraceTimed(fmt.Sprintf("Attempt(%s, %t)", teamID, rotateBeforeAudit), func() error {
 		if attempt.Error != nil {
 			return errors.New(*attempt.Error)
@@ -418,8 +426,8 @@ func (a *BoxAuditor) attemptLocked(mctx libkb.MetaContext, teamID keybase1.TeamI
 
 	if !bytes.Equal(clientSummary.Hash(), serverSummary.Hash()) {
 		mctx.Error("Box audit summary mismatch")
-		mctx.Error("Server summary: %+v", serverSummary.table)
 		mctx.Error("Client summary: %+v", clientSummary.table)
+		mctx.Error("Server summary: %+v", serverSummary.table)
 
 		attempt.Error = getErrorMessage(fmt.Errorf("box summary hash mismatch"))
 		return attempt
@@ -728,13 +736,9 @@ func loadTeamForBoxAuditInner(mctx libkb.MetaContext, teamID keybase1.TeamID, fo
 		ForceRepoll:     true,
 		Public:          teamID.IsPublic(),
 		ForceFullReload: force,
-
-		// The team loader calls box audit if the team is in the jail, so
-		// prevent an infinite loop by disabling that check only for audits.
-		SkipBoxAuditCheck: true,
 	}
 
-	team, err = Load(context.TODO(), mctx.G(), arg)
+	team, err = Load(mctx.Ctx(), mctx.G(), arg)
 	if err != nil {
 		return nil, err
 	}
@@ -759,11 +763,33 @@ func loadTeamForBoxAuditInner(mctx libkb.MetaContext, teamID keybase1.TeamID, fo
 // generates all the PUK generations we expect the team's secret boxes to currently be encrypted for.
 func calculateExpectedSummary(mctx libkb.MetaContext, team *Team) (summary *boxPublicSummary, err error) {
 	defer mctx.TraceTimed("calculateExpectedSummary", func() error { return err })()
+
+	// We use a set because a UV could appear both explicit member and as an implicit admin
 	members, err := team.Members()
 	if err != nil {
 		return nil, err
 	}
-	uvs := members.AllUserVersions()
+	memberUVs := members.AllUserVersions()
+
+	uvSet := make(map[keybase1.UserVersion]bool, len(memberUVs)) // prealloc; will be at least this size
+	for _, memberUV := range memberUVs {
+		uvSet[memberUV] = true
+	}
+
+	if team.IsSubteam() {
+		implicitAdminUVs, err := mctx.G().GetTeamLoader().ImplicitAdmins(mctx.Ctx(), team.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, implicitAdminUV := range implicitAdminUVs {
+			uvSet[implicitAdminUV] = true
+		}
+	}
+
+	uvs := make([]keybase1.UserVersion, 0, len(memberUVs))
+	for uv := range uvSet {
+		uvs = append(uvs, uv)
+	}
 
 	getArg := func(idx int) *libkb.LoadUserArg {
 		if idx >= len(uvs) {
@@ -785,6 +811,12 @@ func calculateExpectedSummary(mctx libkb.MetaContext, team *Team) (summary *boxP
 			mctx.Warning("skipping user %s who has no per-user-key; possibly reset", uv)
 			return
 		}
+
+		if upak.Current.EldestSeqno != uv.EldestSeqno {
+			mctx.Warning("skipping user %s whose per-user-key is ahead of the team's member per-user-key; likely reset and needs to be readded", uv)
+			return
+		}
+
 		d[uv] = *puk
 	}
 
@@ -860,13 +892,11 @@ func retrieveAndVerifySigchainSummary(mctx libkb.MetaContext, team *Team) (summa
 		}
 
 		for uid, seqno := range partialTable {
-			// Expect only one uid per batch, since removing and readding
-			// someone would cause a rotate.
-			_, ok := table[uid]
-			if ok {
-				return nil, fmt.Errorf("got more than one box for %s in the same generation", uid)
-			}
-
+			// NOTE It is possible to have more than one uid in a batch:
+			// if a subteam was created, implicit admins have boxes added for
+			// them by the creator. Then if the implicit admin was added to the
+			// team explicitly, the adder re-encrypts the boxes for them, even
+			// if their PUK is the same.
 			table[uid] = seqno
 		}
 	}

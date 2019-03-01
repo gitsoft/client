@@ -7,6 +7,7 @@ package client
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/keybase/cli"
 	"github.com/keybase/client/go/libcmdline"
@@ -32,6 +33,7 @@ func NewCmdAudit(cl *libcmdline.CommandLine, g *libkb.GlobalContext) cli.Command
 
 type CmdAuditBox struct {
 	libkb.Contextified
+	AuditAllKnownTeams  bool
 	IsInJail            bool
 	Audit               bool
 	Attempt             bool
@@ -50,6 +52,13 @@ func NewCmdAuditBox(cl *libcmdline.CommandLine, g *libkb.GlobalContext) cli.Comm
 	the right members in the team, and that when members revoke devices or
 	reset their accounts, the team's secret keys are rotated accordingly.`,
 		Flags: []cli.Flag{
+			cli.BoolFlag{
+				Name: "audit-all-known-teams",
+				Usage: `Audit all known teams. If an audit fails, the team will
+	be rotated and the audit will be retried immediately . If it fails again,
+	this error will be reported. This operation may take a long time if you are
+	in many teams.`,
+			},
 			cli.StringFlag{
 				Name:  "team-id",
 				Usage: "Team ID, required for all operations except list-known-team-ids",
@@ -93,19 +102,20 @@ func b2i(x bool) int {
 }
 
 func (c *CmdAuditBox) ParseArgv(ctx *cli.Context) error {
+	c.AuditAllKnownTeams = ctx.Bool("audit-all-known-teams")
 	c.IsInJail = ctx.Bool("is-in-jail")
 	c.Audit = ctx.Bool("audit")
 	c.Attempt = ctx.Bool("attempt")
 	c.Ls = ctx.Bool("list-known-team-ids")
-	if b2i(c.IsInJail)+b2i(c.Audit)+b2i(c.Attempt)+b2i(c.Ls) != 1 {
-		return fmt.Errorf("need a single command, is-in-jail, audit, attempt, or list-known-team-ids")
+	if b2i(c.AuditAllKnownTeams)+b2i(c.IsInJail)+b2i(c.Audit)+b2i(c.Attempt)+b2i(c.Ls) != 1 {
+		return fmt.Errorf("need a single command: audit-all-known-teams, is-in-jail, audit, attempt, or list-known-team-ids")
 	}
 	c.RotateBeforeAttempt = ctx.Bool("rotate-before-attempt")
 	if c.RotateBeforeAttempt && !c.Attempt {
 		return fmt.Errorf("can only use --rotate-before-attempt with --attempt")
 	}
 	c.TeamID = keybase1.TeamID(ctx.String("team-id"))
-	if c.Ls {
+	if c.Ls || c.AuditAllKnownTeams {
 		if len(c.TeamID) != 0 {
 			return fmt.Errorf("cannot provide team id with this option")
 		}
@@ -124,6 +134,41 @@ func (c *CmdAuditBox) Run() error {
 	}
 
 	switch {
+	case c.AuditAllKnownTeams:
+		knownTeamIDs, err := cli.KnownTeamIDs(context.Background(), 0)
+		if err != nil {
+			return err
+		}
+		var failedTeamIDs []keybase1.TeamID
+		for _, teamID := range knownTeamIDs {
+			c.G().Log.Info("Now auditing team %s...", teamID)
+			arg := keybase1.BoxAuditTeamArg{TeamID: teamID}
+			var err error
+			for idx := 0; idx < 3; idx++ {
+				// If the previous ones failed, it will be in the retry queue
+				// and hence, this retry will rotate before attempt
+				// automatically.
+				err = cli.BoxAuditTeam(context.Background(), arg)
+				if err == nil {
+					break
+				}
+			}
+			if err != nil {
+				c.G().Log.Error(fmt.Sprintf("Audit %s NOT OK: %s", teamID, err.Error()))
+				failedTeamIDs = append(failedTeamIDs, teamID)
+			} else {
+				c.G().Log.Info("Audit for %s OK", teamID)
+			}
+		}
+		if len(failedTeamIDs) == 0 {
+			return nil
+		} else {
+			failedTeamIDStrings := make([]string, len(failedTeamIDs))
+			for _, failedTeamID := range failedTeamIDs {
+				failedTeamIDStrings = append(failedTeamIDStrings, failedTeamID.String())
+			}
+			return fmt.Errorf("Audits failed for the following teams: %s. They will be retried periodically in the future automatically.", strings.Join(failedTeamIDStrings, ", "))
+		}
 	case c.IsInJail:
 		ok, err := cli.IsInJail(context.Background(), keybase1.IsInJailArg{TeamID: c.TeamID})
 		if err != nil {

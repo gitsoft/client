@@ -5,16 +5,29 @@ handle boxAuditError in gui - check if it even works
 switch to OK with corruptions for release. - in TODO one in jail and another in maybeGet
 OK to ignore Nonce20 and etc?
 CHECK code coverage.. and race?
-PUBLISH KBWEB Change
 TODOs in db.go...lock/release
+maybe lower the schedulers for realz and check that they work
 
 LOWPRI
 I wonder if we need some way for TeamBoxAudit to return an attempt's result regardless if retryable...or just some keybase1Audit{} that embds an Attempt
-cmds for getting history (i.e. need to make protos)
-featureflag? - don't release
+cmds for getting history (i.e. need to make protocols for queue/jail)
 Maybe ServerMal functions have a special suffix or opposite (Suspicious? or different err type...:()
 Switch require.Equals?
 
 ------------------
 
 Decide when to break team load on reaudit failure
+
+test implicit team + JAIG
+
+ek_lib deadlock
+rotate deadlock while in jail
+
+and a subteam with impteams
+
+AssertUnjailedOrReaudit doesn't need lock on teamID unless actually in jail
+
+Check that outside of a box audit, reaudit actually does work on normal team load with no context
+investigate so many BOXAUD logs on startup
+
+GET OTHERS to do full hej
