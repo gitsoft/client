@@ -380,13 +380,11 @@ func (l *LevelDb) KeysWithPrefixes(prefixes ...[]byte) (DBKeySet, error) {
 	// TODO need to lock?
 	opts := &opt.ReadOptions{DontFillCache: true}
 	for _, prefix := range prefixes {
-		fmt.Println("ITER PREFIX", prefix)
-		fmt.Println("%+v", l)
 		iter := l.db.NewIterator(util.BytesPrefix(prefix), opts)
 		for iter.Next() {
-			fmt.Printf("%s\n", iter.Key())
 			_, dbKey, err := DbKeyParse(string(iter.Key()))
 			if err != nil {
+				iter.Release() // TODO ok?
 				return m, err
 			}
 			m[dbKey] = true

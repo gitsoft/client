@@ -2,19 +2,22 @@ package teams
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/keybase/client/go/kbtest"
 	"github.com/keybase/client/go/libkb"
 	"github.com/keybase/client/go/protocol/keybase1"
 	"github.com/stretchr/testify/require"
 )
 
-// TODO test for calculate ClientSummary and etc
 func toErr(attempt keybase1.BoxAuditAttempt) error {
 	if attempt.Error != nil {
 		return errors.New(*attempt.Error)
@@ -23,11 +26,27 @@ func toErr(attempt keybase1.BoxAuditAttempt) error {
 }
 
 func _() {
+	// TODO RM
 	spew.Dump("")
 }
 
-// USE RACE CHECKER
-// also test for consistency between LRU and log
+func mustGetJailLRU(tc *libkb.TestContext, a libkb.TeamBoxAuditor) *lru.Cache {
+	b := a.(*BoxAuditor)
+	return b.jailLRU
+}
+
+func countTrues(t *testing.T, cache *lru.Cache) int {
+	c := 0
+	for _, k := range cache.Keys() {
+		v, ok := cache.Get(k)
+		require.True(t, ok)
+		vBool := v.(bool)
+		if vBool {
+			c++
+		}
+	}
+	return c
+}
 
 func mustGetBoxState(tc *libkb.TestContext, a libkb.TeamBoxAuditor, mctx libkb.MetaContext, teamID keybase1.TeamID) (*BoxAuditLog, *BoxAuditQueue, *BoxAuditJail) {
 	b := a.(*BoxAuditor)
@@ -88,7 +107,7 @@ func TestBoxAuditAttempt(t *testing.T) {
 	attempt = aA.Attempt(aM, teamID, false)
 	require.NoError(t, toErr(attempt), "team rotated, so audit works")
 
-	t.Logf("check after rotate puk")
+	t.Logf("check rotate-before-attempt option")
 	kbtest.RotatePaper(*cTc, cU)
 	attempt = aA.Attempt(aM, teamID, false)
 	require.Error(t, toErr(attempt), "team not rotated after puk rotate so attempt fails")
@@ -110,6 +129,9 @@ func TestBoxAuditAttempt(t *testing.T) {
 	require.NoError(t, err)
 	_, err = AddMember(aM.Ctx(), aTc.G, teamName.String(), cU.Username, keybase1.TeamRole_READER)
 	require.NoError(t, err)
+
+	attempt = cA.Attempt(cM, teamID, false)
+	require.NoError(t, toErr(attempt), "check that attempt is OK after allow reset member back in without another rotate")
 
 	t.Logf("check after delete")
 	kbtest.DeleteAccount(*cTc, cU)
@@ -236,11 +258,14 @@ func TestBoxAuditAudit(t *testing.T) {
 		InProgress: false,
 		Version:    CurrentBoxAuditVersion,
 	})
-	// require.Nil(t, queue)
+	require.Nil(t, queue)
 	require.Equal(t, *jail, BoxAuditJail{
 		TeamIDs: map[keybase1.TeamID]bool{},
 		Version: CurrentBoxAuditVersion,
 	})
+	require.Equal(t, countTrues(t, mustGetJailLRU(aTc, aA)), 0)
+	require.Equal(t, countTrues(t, mustGetJailLRU(bTc, bA)), 0)
+	require.Equal(t, countTrues(t, mustGetJailLRU(cTc, cA)), 0)
 
 	t.Logf("checking state after failed attempts")
 	t.Logf("disable autorotate on retry")
@@ -283,6 +308,7 @@ func TestBoxAuditAudit(t *testing.T) {
 		},
 		Version: CurrentBoxAuditVersion,
 	})
+	require.Equal(t, 1, countTrues(t, mustGetJailLRU(aTc, aA)))
 
 	// NOTE We may eventually cause the jailed team load that did not pass
 	// reaudit to fail entirely instead of just putting up a black bar in the
@@ -291,9 +317,21 @@ func TestBoxAuditAudit(t *testing.T) {
 	_, err = Load(context.TODO(), aTc.G, keybase1.LoadTeamArg{Name: teamName.String(), ForceRepoll: true})
 	require.NoError(t, err)
 
+	inJail, err := aA.IsInJail(aM, teamID)
+	require.NoError(t, err)
+	require.True(t, inJail)
+
 	t.Logf("reenable autorotate on retry")
 	aTc.G.TestOptions.NoAutorotateOnBoxAuditRetry = false
-	err = aA.BoxAuditTeam(aM, teamID)
+
+	// Not in queue anymore so this is a noop
+	err = aA.RetryNextBoxAudit(aM)
+	require.NoError(t, err)
+
+	// We are jailed, but reaudit passes
+	err = aA.AssertUnjailedOrReaudit(aM, teamID)
+	require.NoError(t, err)
+
 	require.NoError(t, err, "no error since we rotate on retry now")
 	log, queue, jail = mustGetBoxState(aTc, aA, aM, teamID)
 	require.False(t, log.InProgress)
@@ -301,6 +339,20 @@ func TestBoxAuditAudit(t *testing.T) {
 	require.Equal(t, attempts[len(attempts)-1].Result, keybase1.BoxAuditAttemptResult_OK_VERIFIED)
 	require.Equal(t, len(queue.Items), 0, "not in queue")
 	require.Equal(t, len(jail.TeamIDs), 0, "unjailed")
+
+	// Just check these public methods are ok
+	teamIDs, err := KnownTeamIDs(aM)
+	require.NoError(t, err)
+	require.Equal(t, len(teamIDs), 1)
+	require.Equal(t, teamIDs[0], teamID)
+
+	randomID, err := randomKnownTeamID(aM)
+	require.NoError(t, err)
+	require.NotNil(t, randomID)
+	require.Equal(t, teamID, *randomID)
+
+	err = aA.BoxAuditRandomTeam(aM)
+	require.NoError(t, err)
 }
 
 // TestBoxAuditRaces makes 3 users, 3 teams with all 3 users, and audits all
@@ -311,6 +363,8 @@ func TestBoxAuditAudit(t *testing.T) {
 // mean there are no data races in the code even if it passes the detector, i.e.,
 // one goroutine could have overwritten a queue add of another goroutine, and this
 // would not be caught by the detector.
+// However, we *do* check that the error is Nonfatal, not Client, which means there
+// were no errors in the leveldb or lru operations, but rather the audit itself.
 func TestBoxAuditRaces(t *testing.T) {
 	fus, tcs, cleanup := setupNTests(t, 3)
 	defer cleanup()
@@ -375,4 +429,155 @@ func TestBoxAuditRaces(t *testing.T) {
 			break
 		}
 	}
+}
+
+// TestBoxAuditCalculation makes a team with three users, has one of them
+// revoke a device and another rotate the team, and makes sure both server and
+// client's view of the summaries match before and after. Finally, it checks to
+// make sure unmarshalAndVerifyBatchSummary actually does verify and if another
+// table's hash is encoded into the sigchain, the function returns a hash
+// mismatch error instead of just accepting the server's table.
+func TestBoxAuditCalculation(t *testing.T) {
+	fus, tcs, cleanup := setupNTests(t, 3)
+	defer cleanup()
+
+	aU, bU, cU := fus[0], fus[1], fus[2]
+	aTc, bTc, cTc := tcs[0], tcs[1], tcs[2]
+	aM, _, cM := libkb.NewMetaContextForTest(*aTc), libkb.NewMetaContextForTest(*bTc), libkb.NewMetaContextForTest(*cTc)
+
+	aTeamName, aTeamID := createTeam2(*aTc)
+	_, err := AddMember(aM.Ctx(), aTc.G, aTeamName.String(), bU.Username, keybase1.TeamRole_ADMIN)
+	require.NoError(t, err)
+	_, err = AddMember(aM.Ctx(), aTc.G, aTeamName.String(), cU.Username, keybase1.TeamRole_ADMIN)
+	require.NoError(t, err)
+
+	puk := aU.User.GetComputedKeyFamily().GetLatestPerUserKey()
+	initSeqno := puk.Seqno
+
+	team, err := loadTeamForBoxAudit(aM, aTeamID)
+	require.NoError(t, err)
+	serverSummary, err := retrieveAndVerifySigchainSummary(aM, team)
+	require.NoError(t, err)
+	clientSummary, err := calculateExpectedSummary(aM, team)
+	require.NoError(t, err)
+	expected := boxPublicSummaryTable{
+		aU.User.GetUID(): initSeqno,
+		bU.User.GetUID(): initSeqno,
+		cU.User.GetUID(): initSeqno,
+	}
+	require.Equal(t, expected, serverSummary.table)
+	require.Equal(t, expected, clientSummary.table)
+
+	t.Logf("B rotates PUK")
+	kbtest.RotatePaper(*bTc, bU)
+
+	t.Logf("A rotates team")
+	err = team.Rotate(aM.Ctx())
+	require.NoError(t, err)
+
+	t.Logf("C checks summary")
+	// Need to reload team so we know the latest PTK generation to ask server the batches for
+	team, err = loadTeamForBoxAudit(cM, aTeamID)
+	require.NoError(t, err)
+	serverSummary, err = retrieveAndVerifySigchainSummary(cM, team)
+	require.NoError(t, err)
+	clientSummary, err = calculateExpectedSummary(cM, team)
+	require.NoError(t, err)
+	expected = boxPublicSummaryTable{
+		aU.User.GetUID(): initSeqno,
+		bU.User.GetUID(): initSeqno + 3,
+		cU.User.GetUID(): initSeqno,
+	}
+	require.Equal(t, expected, serverSummary.table)
+	require.Equal(t, expected, clientSummary.table)
+
+	t.Logf("check we're verifying sigchain hash against server's claim")
+
+	sigchainClaimedTableHashPreimage := boxPublicSummaryTable{
+		aU.User.GetUID(): initSeqno,
+		bU.User.GetUID(): initSeqno + 3,
+		cU.User.GetUID(): initSeqno,
+	}
+	sigchainClaimedSummary, err := newBoxPublicSummaryFromTable(sigchainClaimedTableHashPreimage)
+	require.NoError(t, err)
+	sigchainClaimedSummaryHash := sigchainClaimedSummary.Hash()
+
+	// Simulate a malicious server rollback
+	serverClaimedTable := boxPublicSummaryTable{
+		aU.User.GetUID(): initSeqno,
+		bU.User.GetUID(): initSeqno,
+		cU.User.GetUID(): initSeqno,
+	}
+	serverClaimedSummary, err := newBoxPublicSummaryFromTable(serverClaimedTable)
+	require.NoError(t, err)
+	serverClaimedSummaryEncoded := serverClaimedSummary.encoded
+	serverClaimedSummaryEncodedBase64d := base64.StdEncoding.EncodeToString(serverClaimedSummaryEncoded)
+
+	_, err = unmarshalAndVerifyBatchSummary(serverClaimedSummaryEncodedBase64d, sigchainClaimedSummaryHash)
+	require.Error(t, err)
+	msg := fmt.Sprintf("expected hash %x signed into sigchain, but got", sigchainClaimedSummaryHash)
+	require.True(t, strings.Contains(err.Error(), msg))
+}
+
+func TestBoxAuditOpen(t *testing.T) {
+	_, tcs, cleanup := setupNTests(t, 1)
+	defer cleanup()
+	tc := tcs[0]
+
+	b, err := libkb.RandBytes(4)
+	auditor := tc.G.GetTeamBoxAuditor()
+	require.NoError(t, err)
+	name := hex.EncodeToString(b)
+	_, err = CreateRootTeam(context.Background(), tc.G, name, keybase1.TeamSettings{
+		Open:   true,
+		JoinAs: keybase1.TeamRole_WRITER,
+	})
+	require.NoError(t, err)
+
+	mctx := libkb.NewMetaContextForTest(*tc)
+	teamname, err := keybase1.TeamNameFromString(name)
+	require.NoError(t, err)
+	attempt := auditor.Attempt(mctx, teamname.ToPrivateTeamID(), false)
+
+	require.Equal(t, attempt.Result, keybase1.BoxAuditAttemptResult_OK_NOT_ATTEMPTED_OPENTEAM)
+}
+
+func TestBoxAuditImplicit(t *testing.T) {
+	fus, tcs, cleanup := setupNTests(t, 2)
+	defer cleanup()
+
+	var teamIDs []keybase1.TeamID
+
+	for idx, isPublic := range []bool{false, true} {
+		t.Logf("testing audit implicit with public=%t", isPublic)
+		team1, _, _, err := LookupOrCreateImplicitTeam(context.TODO(), tcs[idx].G, "t_tracy,"+fus[idx].Username, isPublic)
+		require.NoError(t, err)
+		auditor := tcs[idx].G.GetTeamBoxAuditor()
+		mctx := libkb.NewMetaContextForTest(*tcs[idx])
+		attempt := auditor.Attempt(mctx, team1.ID, false)
+		require.Equal(t, attempt.Result, keybase1.BoxAuditAttemptResult_OK_VERIFIED)
+		require.NoError(t, auditor.BoxAuditTeam(mctx, team1.ID))
+		teamIDs = append(teamIDs, team1.ID)
+	}
+
+	// Check we keep track of public and private implicit teams too
+	mctx := libkb.NewMetaContextForTest(*tcs[0])
+	knownTeamIDs, err := KnownTeamIDs(mctx)
+	require.NoError(t, err)
+	require.Equal(t, len(knownTeamIDs), 1)
+	require.Equal(t, teamIDs[0], knownTeamIDs[0])
+	randomID, err := randomKnownTeamID(mctx)
+	require.NoError(t, err)
+	require.NotNil(t, randomID)
+	require.True(t, teamIDs[0] == *randomID)
+
+	mctx = libkb.NewMetaContextForTest(*tcs[1])
+	knownTeamIDs, err = KnownTeamIDs(mctx)
+	require.NoError(t, err)
+	require.Equal(t, len(knownTeamIDs), 1)
+	require.Equal(t, teamIDs[1], knownTeamIDs[0])
+	randomID, err = randomKnownTeamID(mctx)
+	require.NoError(t, err)
+	require.NotNil(t, randomID)
+	require.True(t, teamIDs[1] == *randomID)
 }
