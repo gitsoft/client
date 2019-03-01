@@ -322,7 +322,7 @@ export type _State = {
   uploads: Uploads,
   fuseStatus: ?RPCTypes.FuseStatus,
   flags: Flags,
-  localHTTPServerInfo: ?LocalHTTPServer,
+  localHTTPServerInfo: LocalHTTPServer,
   errors: I.Map<string, FsError>,
   tlfUpdates: UserTlfUpdates,
   moveOrCopy: MoveOrCopy,
