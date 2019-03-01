@@ -197,7 +197,7 @@ class FriendRow extends React.Component<FriendRowProps> {
   }
 }
 
-type BioTeamProofsProps = {|
+export type BioTeamProofsProps = {|
   onAddIdentity: ?() => void,
   assertionKeys: ?Array<string>,
   backgroundColorType: BackgroundColorType,
@@ -206,7 +206,7 @@ type BioTeamProofsProps = {|
   username: string,
   reason: string,
 |}
-class BioTeamProofs extends React.PureComponent<BioTeamProofsProps> {
+export class BioTeamProofs extends React.PureComponent<BioTeamProofsProps> {
   render() {
     return Styles.isMobile ? (
       <Kb.Box2 direction="vertical" fullWidth={true} style={styles.bioAndProofs}>
