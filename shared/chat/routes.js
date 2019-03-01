@@ -146,7 +146,6 @@ export const newRoutes = {
   chatDeleteHistoryWarning: {getScreen: () => require('./delete-history-warning/container').default},
   chatEditChannel: {getScreen: () => require('./manage-channels/edit-channel-container').default},
   chatEnterPaperkey: {getScreen: () => require('./conversation/rekey/enter-paper-key').default},
-  chatNewChat: {getScreen: () => require('../team-building/container').default},
   chatPaymentsConfirm: {getScreen: () => require('./payments/confirm/container').default},
   chatShowNewTeamDialog: {getScreen: () => require('./new-team-dialog-container').default},
   'tabs.chatTab': {
@@ -167,6 +166,7 @@ export const newModalRoutes = {
   },
   chatInfoPanel: {getScreen: () => require('./conversation/info-panel/container').default},
   chatManageChannels: {getScreen: () => require('./manage-channels/container').default},
+  chatNewChat: {getScreen: () => require('../team-building/container').default},
   chatShowBlockConversationDialog: {
     getScreen: () => require('./conversation/block-conversation-warning/container').default,
   },

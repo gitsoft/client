@@ -28,9 +28,6 @@ const shimNewRoute = (Original: any) => {
       this._didFocusSubscription = props.navigation.addListener('didFocus', this._didFocus)
     }
     render() {
-      if (!this.state.canDraw) {
-        return null
-      }
       const body = <Original {...this.props} />
       const keyboardBody = (
         <Kb.NativeKeyboardAvoidingView
@@ -38,12 +35,14 @@ const shimNewRoute = (Original: any) => {
           behavior={Styles.isIOS ? 'padding' : undefined}
         >
           {body}
-          <GatewayDest
-            name="keyboard-avoiding-root"
-            component={ViewForGatewayDest}
-            pointerEvents="box-none"
-            style={styles.gatewayDest}
-          />
+          {this.state.canDraw && (
+            <GatewayDest
+              name="keyboard-avoiding-root"
+              component={ViewForGatewayDest}
+              pointerEvents="box-none"
+              style={styles.gatewayDest}
+            />
+          )}
         </Kb.NativeKeyboardAvoidingView>
       )
 
